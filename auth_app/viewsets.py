@@ -1,8 +1,8 @@
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import User, KYC, OTP
-from .serializers import UserSerializer, KYCSerializer, OTPSerializer
+from .models import User, KYC, OTP, Referral
+from .serializers import UserSerializer, KYCSerializer, OTPSerializer, ReferralSerializer
 
 
 class CustomPagination(PageNumberPagination):
@@ -31,3 +31,11 @@ class OTPViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['user', 'is_used']  # Fields you want to filter by
+
+
+class ReferralViewSet(viewsets.ModelViewSet):
+    queryset = Referral.objects.all()
+    serializer_class = ReferralSerializer
+    pagination_class = CustomPagination
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['user',]  # Fields you want to filter by

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, KYC, OTP
+from .models import User, KYC, OTP, Referral
 
 
 # Serializer for User model
@@ -27,3 +27,8 @@ class OTPSerializer(serializers.ModelSerializer):
     class Meta:
         model = OTP
         fields = ('user', 'otp', 'created_at', 'is_used')
+
+class ReferralSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Referral
+        fields = ('user', 'referer', 'created_at',)

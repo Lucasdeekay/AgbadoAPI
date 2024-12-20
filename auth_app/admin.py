@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, KYC, OTP
+from .models import User, KYC, OTP, Referral
 
 
 # Registering the User model with custom admin interface
@@ -24,7 +24,13 @@ class OTPAdmin(admin.ModelAdmin):
     list_filter = ('is_used',)
     ordering = ('-created_at',)
 
+class ReferralAdmin(admin.ModelAdmin):
+    list_display = ('user', 'referer', 'created_at',)
+    search_fields = ('user__email',)
+    ordering = ('-created_at',)
+
 
 admin.site.register(User, UserAdmin)
 admin.site.register(KYC, KYCAdmin)
 admin.site.register(OTP, OTPAdmin)
+admin.site.register(Referral, ReferralAdmin)

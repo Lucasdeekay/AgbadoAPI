@@ -27,9 +27,12 @@ class User(AbstractUser):
     username = None  # Remove the username field
     email = models.EmailField(unique=True)
     phone_number = models.CharField(max_length=15, unique=True)
+    state = models.CharField(max_length=50)
     is_service_provider = models.BooleanField(default=False)
     is_verified = models.BooleanField(default=False)  # To check if the user has completed KYC
     date_joined = models.DateTimeField(auto_now_add=True)
+    profile_picture = models.ImageField(upload_to='profile_picture/', null=True, blank=True)
+    referral_code = models.CharField(max_length=15, unique=True, null=True, blank=True)
 
     objects = UserManager()
 
@@ -42,9 +45,9 @@ class User(AbstractUser):
 
 class KYC(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="kyc")
-    national_id = models.CharField(max_length=20, null=True, blank=True)
+    national_id = models.ImageField(upload_to='national_id/', null=True, blank=True)
     bvn = models.CharField(max_length=11, null=True, blank=True)
-    driver_license = models.CharField(max_length=20, null=True, blank=True)
+    driver_license = models.ImageField(upload_to='driver_license/', null=True, blank=True)
     proof_of_address = models.ImageField(upload_to='proof_of_address/', null=True, blank=True)
     status = models.CharField(max_length=10,
                               choices=[('Pending', 'Pending'), ('Verified', 'Verified'), ('Rejected', 'Rejected')],
@@ -71,3 +74,11 @@ class OTP(models.Model):
 
     def __str__(self):
         return f"OTP for {self.user.email} - {'Used' if self.is_used else 'Not Used'}"
+
+class Referral(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="referral")
+    referer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="referral")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.email} referral - {self.referer.email}"

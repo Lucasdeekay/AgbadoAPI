@@ -1,5 +1,6 @@
 import jwt
 from rest_framework import status, permissions
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
@@ -8,8 +9,24 @@ from django.core.exceptions import ValidationError
 
 from agbado import settings
 from .serializers import UserSerializer
-from .models import User as CustomUser, OTP
+from .models import User as CustomUser, OTP, Referral
 from .utils import create_otp, send_otp_email, send_otp_sms, get_google_user_info, get_apple_user_info
+
+
+def get_user_from_token(request):
+    """
+    Extracts the user from the token in the Authorization header.
+
+    :param request: The current request object
+    :return: The user associated with the token
+    :raises: AuthenticationFailed if token is invalid or missing
+    """
+    try:
+        token = request.headers.get('Authorization', '').split(' ')[1]
+        token = Token.objects.get(key=token)
+        return token.user
+    except Exception:
+        raise AuthenticationFailed('Invalid token')
 
 
 class RegisterView(APIView):
@@ -17,9 +34,13 @@ class RegisterView(APIView):
         """
         Register a new user. Either email or phone number is required.
         """
+        first_name = request.data.get('first_name')
+        last_name = request.data.get('last_name')
         email = request.data.get('email')
         phone_number = request.data.get('phone_number')
+        state = request.data.get('state')
         password = request.data.get('password')
+        referral_code = request.data.get('referral_code')
 
         if not email or not phone_number or not password:
             return Response({"error": "Email, phone number, and password are required."},
@@ -32,9 +53,18 @@ class RegisterView(APIView):
             return Response({"error": "A user with this phone number already exists."},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        if not CustomUser.objects.filter(referral_code=referral_code).exists():
+            return Response({"error": "The referral code matches no existing user."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        referer = CustomUser.objects.get(referral_code=referral_code)
+
         user_data = {
+            'first_name': first_name,
+            'last_name': last_name,
             'email': email,
             'phone_number': phone_number,
+            'state': state,
             'password': password
         }
         serializer = UserSerializer(data=user_data)
@@ -46,6 +76,8 @@ class RegisterView(APIView):
 
             user.is_active = False  # Deactivate account until verification
             user.save()
+
+            Referral.objects.create(user=user, referer=referer)
 
             # Generate and send OTP
             otp_instance = create_otp(user)
@@ -191,8 +223,11 @@ class ForgotPasswordView(APIView):
         otp = otp_instance.otp
 
         # Send OTP to email and phone
-        send_otp_email(user, otp)
-        send_otp_sms(user, otp)
+        if '@' in identifier:
+            send_otp_email(user, otp)
+        else:
+            send_otp_sms(user, otp)
+
 
         return Response({"message": "OTP sent to your email and phone number."}, status=status.HTTP_200_OK)
 
@@ -238,7 +273,36 @@ class RetrievePasswordView(APIView):
         existing_otp.is_used = True
         existing_otp.save()
 
+        return Response({"message": "OTP successfully verified."}, status=status.HTTP_200_OK)
+
+class ResetPasswordView(APIView):
+    def post(self, request):
+        """
+        Retrieve and reset password using OTP.
+        User provides OTP and a new password.
+        """
+        identifier = request.data.get('identifier')  # email or phone number
+        new_password = request.data.get('new_password')
+
+        if not identifier or not new_password:
+            return Response({"error": "Identifier (email or phone), OTP, and new password are required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Check if identifier is email or phone number
+            if '@' in identifier:
+                user = CustomUser.objects.get(email=identifier)
+            else:
+                user = CustomUser.objects.get(phone_number=identifier)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User with the provided email or phone number does not exist."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        # Update password
+        user.set_password(new_password)
+        user.save()
+
         return Response({"message": "Password has been successfully reset."}, status=status.HTTP_200_OK)
+
 
 
 class GoogleAuthView(APIView):

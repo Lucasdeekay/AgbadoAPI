@@ -1,8 +1,8 @@
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Wallet, Transaction
-from .serializers import WalletSerializer, TransactionSerializer
+from .models import Wallet, Transaction, Withdrawal
+from .serializers import WalletSerializer, TransactionSerializer, WithdrawalSerializer
 
 
 class CustomPagination(PageNumberPagination):
@@ -23,3 +23,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['wallet', 'type', 'amount']  # Fields you want to filter by
+
+
+class WithdrawalViewSet(viewsets.ModelViewSet):
+    queryset = Withdrawal.objects.all()
+    serializer_class = WithdrawalSerializer
+    pagination_class = CustomPagination
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['status', 'created_at']
