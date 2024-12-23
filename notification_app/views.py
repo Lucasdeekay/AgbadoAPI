@@ -20,6 +20,9 @@ class GetUserNotificationsView(APIView):
             # Retrieve all notifications for the authenticated user, ordered by time
             notifications = Notification.objects.filter(user=user).order_by('-created_at')
 
+            # Mark all notifications as read
+            notifications.update(is_read=True)
+
             # Serialize the data to return the notifications
             notification_data = [
                 {

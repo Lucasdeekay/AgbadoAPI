@@ -42,6 +42,7 @@ urlpatterns = [
     path('provider/', include('provider_app.urls')),  # Include the provider app URLs
     path('service/', include('service_app.urls')),  # Include the service app URLs
     path('user/', include('user_app.urls')),  # Include the user app URLs
+    path('notification/', include('notification_app.urls')),  # Include the notification app URLs
     path('docs/', include_docs_urls(title='AgbaDo API Documentation', public=True)),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),

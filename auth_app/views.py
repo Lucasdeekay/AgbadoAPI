@@ -4,7 +4,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, login, logout
 from django.core.exceptions import ValidationError
 
 from agbado import settings
@@ -96,6 +96,45 @@ class RegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class SendOTPView(APIView):
+    def post(self, request):
+        """
+        Verify the user's registration using OTP.
+        """
+        identifier = request.data.get('identifier')  # email or phone number
+
+        if not identifier:
+            return Response({"error": "Identifier (email or phone) and OTP are required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Check if identifier is email or phone number
+            if '@' in identifier:
+                user = CustomUser.objects.get(email=identifier)
+
+                # Generate and send OTP
+                otp_instance = create_otp(user)
+                otp = otp_instance.otp
+
+                # Send OTP to email
+                send_otp_email(user, otp)
+            else:
+                user = CustomUser.objects.get(phone_number=identifier)
+
+                # Generate and send OTP
+                otp_instance = create_otp(user)
+                otp = otp_instance.otp
+
+                # Send OTP to phone
+                send_otp_sms(user, otp)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User with the provided email or phone number does not exist."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+
+        return Response({"message": "OTP successfully sent. You can now log in."}, status=status.HTTP_200_OK)
+
+
 class VerifyOTPView(APIView):
     def post(self, request):
         """
@@ -166,6 +205,7 @@ class LoginView(APIView):
                 user = None
 
         if user is not None:
+            login(request, user)
             # Create and return token if credentials are valid
             token, created = Token.objects.get_or_create(user=user)
             return Response({
@@ -186,6 +226,7 @@ class LogoutView(APIView):
         """
         Logout the user and delete their token.
         """
+        logout(request)
         request.user.auth_token.delete()
         return Response({"message": "Logged out successfully."}, status=status.HTTP_200_OK)
 
@@ -232,49 +273,6 @@ class ForgotPasswordView(APIView):
         return Response({"message": "OTP sent to your email and phone number."}, status=status.HTTP_200_OK)
 
 
-class RetrievePasswordView(APIView):
-    def post(self, request):
-        """
-        Retrieve and reset password using OTP.
-        User provides OTP and a new password.
-        """
-        identifier = request.data.get('identifier')  # email or phone number
-        otp = request.data.get('otp')
-        new_password = request.data.get('new_password')
-
-        if not identifier or not otp or not new_password:
-            return Response({"error": "Identifier (email or phone), OTP, and new password are required."},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            # Check if identifier is email or phone number
-            if '@' in identifier:
-                user = CustomUser.objects.get(email=identifier)
-            else:
-                user = CustomUser.objects.get(phone_number=identifier)
-        except CustomUser.DoesNotExist:
-            return Response({"error": "User with the provided email or phone number does not exist."},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        # Check OTP validity
-        existing_otp = OTP.objects.filter(user=user, otp=otp, is_used=False).last()
-
-        if not existing_otp:
-            return Response({"error": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if existing_otp.is_expired():
-            return Response({"error": "OTP has expired."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Update password
-        user.set_password(new_password)
-        user.save()
-
-        # Mark OTP as used
-        existing_otp.is_used = True
-        existing_otp.save()
-
-        return Response({"message": "OTP successfully verified."}, status=status.HTTP_200_OK)
-
 class ResetPasswordView(APIView):
     def post(self, request):
         """
@@ -297,12 +295,12 @@ class ResetPasswordView(APIView):
         except CustomUser.DoesNotExist:
             return Response({"error": "User with the provided email or phone number does not exist."},
                             status=status.HTTP_400_BAD_REQUEST)
+
         # Update password
         user.set_password(new_password)
         user.save()
 
         return Response({"message": "Password has been successfully reset."}, status=status.HTTP_200_OK)
-
 
 
 class GoogleAuthView(APIView):

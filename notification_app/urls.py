@@ -9,7 +9,7 @@ router.register(r'notifications', NotificationViewSet)
 
 
 urlpatterns = [
-    path('notifications/', GetUserNotificationsView.as_view(), name='get_user_notifications'),
-    path('notifications/<int:notification_id>/mark-read/', UpdateAllNotificationsReadStatusView.as_view(), name='update_notification_read_status'),
+    path('', GetUserNotificationsView.as_view(), name='get_user_notifications'),
+    path('mark-read/', UpdateAllNotificationsReadStatusView.as_view(), name='update_notification_read_status'),
     path('api/', include(router.urls)),  # All routes are prefixed with 'api/'
 ]

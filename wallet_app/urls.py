@@ -10,7 +10,7 @@ router.register(r'transactions', TransactionViewSet)
 router.register(r'withdrawals', WithdrawalViewSet)
 
 urlpatterns = [
-    path('wallet/', WalletDetailsView.as_view(), name='wallet-details'),
+    path('', WalletDetailsView.as_view(), name='wallet-details'),
     path('transactions/', AllTransactionsView.as_view(), name='all-transactions'),
     path('transactions/<int:transaction_id>/', TransactionDetailView.as_view(), name='transaction-detail'),
     path('deposit/', DepositView.as_view(), name='deposit'),

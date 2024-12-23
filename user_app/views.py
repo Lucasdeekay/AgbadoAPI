@@ -5,9 +5,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
-
-from django.contrib.auth import get_user_model
 
 from auth_app.views import get_user_from_token
 from notification_app.models import Notification
@@ -180,3 +177,33 @@ class UpdateKYCView(APIView):
                 {"error": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class ChangePasswordView(APIView):
+    authentication_classes = [TokenAuthentication]
+    # permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """
+        Change the user's password after validating the current password.
+        User provides current_password and new_password.
+        """
+        user = get_user_from_token(request)
+
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+
+        if not current_password or not new_password:
+            return Response({"error": "Both current_password and new_password are required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate the current password
+        if not user.check_password(current_password):
+            return Response({"error": "The current password is incorrect."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Set the new password
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"message": "Password has been successfully changed."}, status=status.HTTP_200_OK)
