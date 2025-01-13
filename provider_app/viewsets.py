@@ -14,4 +14,4 @@ class ServiceProviderViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceProviderSerializer
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['name', 'status', 'category']  # Fields you want to filter by
+    filterset_fields = ['company_name', 'business_category', 'is_approved']  # Updated to use actual fields from the model

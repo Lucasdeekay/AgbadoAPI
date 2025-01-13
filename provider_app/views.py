@@ -1,9 +1,9 @@
 from django.db import IntegrityError
-from requests import Response
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from rest_framework.response import Response
 
 from auth_app.views import get_user_from_token
 from provider_app.models import ServiceProvider
@@ -26,12 +26,16 @@ class CreateServiceProviderView(APIView):
         # Extract data from the request
         company_name = request.data.get("company_name")
         company_address = request.data.get("company_address")
-        contact_info = request.data.get("contact_info")
+        company_description = request.data.get("company_description")
+        company_phone_no = request.data.get("company_phone_no")
+        company_email = request.data.get("company_email")
         business_category = request.data.get("business_category")
         company_logo = request.FILES.get("company_logo")
+        opening_hour = request.data.get("opening_hour")
+        closing_hour = request.data.get("closing_hour")
 
         # Validate required fields
-        if not company_name or not company_address or not contact_info or not business_category:
+        if not company_name or not company_address or not business_category:
             return Response(
                 {"error": "All required fields must be provided."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -43,9 +47,13 @@ class CreateServiceProviderView(APIView):
                 user=user,
                 company_name=company_name,
                 company_address=company_address,
-                contact_info=contact_info,
+                company_description=company_description,
+                company_phone_no=company_phone_no,
+                company_email=company_email,
                 business_category=business_category,
                 company_logo=company_logo,
+                opening_hour=opening_hour,
+                closing_hour=closing_hour,
             )
 
             service_provider.save()
@@ -66,6 +74,7 @@ class CreateServiceProviderView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+
 class EditServiceProviderView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -85,12 +94,16 @@ class EditServiceProviderView(APIView):
         # Extract data from the request
         company_name = request.data.get("company_name")
         company_address = request.data.get("company_address")
-        contact_info = request.data.get("contact_info")
+        company_description = request.data.get("company_description")
+        company_phone_no = request.data.get("company_phone_no")
+        company_email = request.data.get("company_email")
         business_category = request.data.get("business_category")
         company_logo = request.FILES.get("company_logo")
+        opening_hour = request.data.get("opening_hour")
+        closing_hour = request.data.get("closing_hour")
 
         # Handle empty requests gracefully
-        if not company_name and not company_address and not contact_info and not business_category and not company_logo:
+        if not any([company_name, company_address, company_description, company_phone_no, company_email, business_category, company_logo, opening_hour, closing_hour]):
             return Response(
                 {"error": "No data provided to update."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -102,12 +115,20 @@ class EditServiceProviderView(APIView):
                 service_provider.company_name = company_name
             if company_address:
                 service_provider.company_address = company_address
-            if contact_info:
-                service_provider.contact_info = contact_info
+            if company_description:
+                service_provider.company_description = company_description
+            if company_phone_no:
+                service_provider.company_phone_no = company_phone_no
+            if company_email:
+                service_provider.company_email = company_email
             if business_category:
                 service_provider.business_category = business_category
             if company_logo:
                 service_provider.company_logo = company_logo
+            if opening_hour:
+                service_provider.opening_hour = opening_hour
+            if closing_hour:
+                service_provider.closing_hour = closing_hour
 
             service_provider.save()
 
@@ -126,6 +147,7 @@ class EditServiceProviderView(APIView):
                 {"error": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
 
 class GetServiceProviderDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
@@ -147,9 +169,13 @@ class GetServiceProviderDetailsView(APIView):
         data = {
             "company_name": service_provider.company_name,
             "company_address": service_provider.company_address,
-            "contact_info": service_provider.contact_info,
+            "company_description": service_provider.company_description,
+            "company_phone_no": service_provider.company_phone_no,
+            "company_email": service_provider.company_email,
             "business_category": service_provider.business_category,
             "company_logo": service_provider.company_logo.url if service_provider.company_logo else None,
+            "opening_hour": service_provider.opening_hour,
+            "closing_hour": service_provider.closing_hour,
             "is_approved": service_provider.is_approved,
             "created_at": service_provider.created_at,
         }
