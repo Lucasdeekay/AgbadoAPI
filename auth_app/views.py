@@ -1,3 +1,4 @@
+from django.shortcuts import redirect
 import jwt
 from rest_framework import status, permissions
 from rest_framework.exceptions import AuthenticationFailed
@@ -303,32 +304,38 @@ class ResetPasswordView(APIView):
         return Response({"message": "Password has been successfully reset."}, status=status.HTTP_200_OK)
 
 
-class GoogleAuthView(APIView):
+class GoogleAppleAuthView(APIView):
     def post(self, request):
-        token = request.data.get("token")
-        if not token:
-            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+        data = request.data
 
+        email = data.get("email")
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
+        phone_number = data.get("phone_number")
+        password = data.get("password")  # Not necessary for Google but can be used for registration
+        state = data.get('state')
+        password = data.get('password')
+        referral_code = data.get('referral_code')
+
+        # Check if user already exists
         try:
-            user_info = get_google_user_info(token)
-            email = user_info["email"]
-            first_name = user_info.get("given_name", "")
-            last_name = user_info.get("family_name", "")
+            user = CustomUser.objects.get(email=email)
+            # If user exists, login and return data
+            login(request, user)
+            return Response({
+                "message": "Login successful",
+                "user": {
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "phone_number": getattr(user.profile, 'phone_number', None)
+                }
+            }, status=status.HTTP_200_OK)
 
-            user, _ = CustomUser.objects.get_or_create(email=email)
-            user.first_name = first_name
-            user.last_name = last_name
-            user.is_verified = True
-            user.save()
+        except CustomUser.DoesNotExist:
+            # If user doesn't exist, register them
+            return redirect('register')  # Redirect to the Register view (you can handle this in frontend)
 
-            auth_token, _ = Token.objects.get_or_create(user=user)
-            return Response({"token": auth_token.key}, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class AppleAuthView(APIView):
     def post(self, request):
         code = request.data.get("code")
         if not code:
