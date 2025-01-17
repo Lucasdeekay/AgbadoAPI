@@ -11,7 +11,7 @@ from django.core.exceptions import ValidationError
 from agbado import settings
 from .serializers import UserSerializer
 from .models import User as CustomUser, OTP, Referral
-from .utils import create_otp, send_otp_email, send_otp_sms, get_google_user_info, get_apple_user_info
+from .utils import create_otp, send_otp_email, send_otp_sms
 
 
 def get_user_from_token(request):
