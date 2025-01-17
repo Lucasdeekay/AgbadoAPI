@@ -57,11 +57,9 @@ class RegisterView(APIView):
             return Response({"error": "A user with this phone number already exists."},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        if not CustomUser.objects.filter(referral_code=referral_code).exists():
-            return Response({"error": "The referral code matches no existing user."},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        referer = CustomUser.objects.get(referral_code=referral_code)
+        if CustomUser.objects.filter(referral_code=referral_code).exists():
+            referer = CustomUser.objects.get(referral_code=referral_code)
+            Referral.objects.create(user=user, referer=referer)
 
         user_data = {
             'first_name': first_name,
@@ -80,8 +78,6 @@ class RegisterView(APIView):
 
             user.is_active = False  # Deactivate account until verification
             user.save()
-
-            Referral.objects.create(user=user, referer=referer)
 
             # Generate and send OTP
             otp_instance = create_otp(user)
