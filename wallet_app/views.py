@@ -7,6 +7,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from django.db import transaction as db_transaction
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 
 from auth_app.views import get_user_from_token
 from wallet_app.models import Wallet, Transaction, Withdrawal
@@ -15,6 +17,7 @@ from auth_app.models import User
 
 
 # 1. View to return wallet details and last 5 transactions
+@method_decorator(csrf_exempt, name='dispatch')
 class WalletDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -46,6 +49,7 @@ class WalletDetailsView(APIView):
 
 
 # 2. View to return all transactions for the user
+@method_decorator(csrf_exempt, name='dispatch')
 class AllTransactionsView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -65,6 +69,7 @@ class AllTransactionsView(APIView):
 
 
 # 3. View to return details of a specific transaction
+@method_decorator(csrf_exempt, name='dispatch')
 class TransactionDetailView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -86,7 +91,7 @@ class TransactionDetailView(APIView):
         except Exception as e:
             return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class DepositView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -129,7 +134,7 @@ class DepositView(APIView):
         except Exception as e:
             return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class WithdrawalRequestView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]

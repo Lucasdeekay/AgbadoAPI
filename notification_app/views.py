@@ -7,8 +7,10 @@ from rest_framework.permissions import IsAuthenticated
 from auth_app.views import get_user_from_token
 from .models import Notification
 from django.db import DatabaseError
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class GetUserNotificationsView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -48,7 +50,7 @@ class GetUserNotificationsView(APIView):
                 'error': f'An unexpected error occurred: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class UpdateAllNotificationsReadStatusView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]

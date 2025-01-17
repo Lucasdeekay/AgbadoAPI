@@ -1,6 +1,9 @@
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, DatabaseError
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -11,7 +14,7 @@ from notification_app.models import Notification
 from wallet_app.models import Wallet, Transaction
 from wallet_app.serializers import TransactionSerializer
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class DashboardView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -74,7 +77,7 @@ class DashboardView(APIView):
 
         return Response(response_data, status=status.HTTP_200_OK)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class UpdateUserProfileView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -121,7 +124,7 @@ class UpdateUserProfileView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class UpdateKYCView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -178,7 +181,7 @@ class UpdateKYCView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class ChangePasswordView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]

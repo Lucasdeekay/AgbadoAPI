@@ -1,4 +1,7 @@
 from django.db import IntegrityError
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -8,7 +11,7 @@ from rest_framework.response import Response
 from auth_app.views import get_user_from_token
 from provider_app.models import ServiceProvider
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class CreateServiceProviderView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -74,7 +77,7 @@ class CreateServiceProviderView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class EditServiceProviderView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -148,7 +151,7 @@ class EditServiceProviderView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class GetServiceProviderDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]

@@ -1,4 +1,7 @@
 from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
@@ -10,7 +13,7 @@ from provider_app.serializers import ServiceProviderSerializer
 from service_app.models import SubService, Service, Booking
 from service_app.serializers import ServiceSerializer, SubServiceSerializer
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class ServiceProviderDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
 
@@ -46,7 +49,7 @@ class ServiceProviderDetailsView(APIView):
         except Exception as e:
             return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class ServiceDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
 
@@ -71,7 +74,7 @@ class ServiceDetailsView(APIView):
         except Exception as e:
             return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class AddServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 
@@ -85,7 +88,7 @@ class AddServiceView(APIView):
                             status=status.HTTP_201_CREATED)
         return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class AddSubServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 
@@ -99,7 +102,7 @@ class AddSubServiceView(APIView):
                             status=status.HTTP_201_CREATED)
         return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class EditServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 
@@ -114,7 +117,7 @@ class EditServiceView(APIView):
                             status=status.HTTP_200_OK)
         return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class EditSubServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 

@@ -7,6 +7,8 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
 from django.core.exceptions import ValidationError
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 
 from agbado import settings
 from .serializers import UserSerializer
@@ -30,6 +32,7 @@ def get_user_from_token(request):
         raise AuthenticationFailed('Invalid token')
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(APIView):
     def post(self, request):
         """
@@ -96,7 +99,7 @@ class RegisterView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class SendOTPView(APIView):
     def post(self, request):
         """
@@ -135,7 +138,7 @@ class SendOTPView(APIView):
 
         return Response({"message": "OTP successfully sent. You can now log in."}, status=status.HTTP_200_OK)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class VerifyOTPView(APIView):
     def post(self, request):
         """
@@ -178,7 +181,7 @@ class VerifyOTPView(APIView):
 
         return Response({"message": "Account verified successfully. You can now log in."}, status=status.HTTP_200_OK)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
     def post(self, request):
         """
@@ -219,7 +222,7 @@ class LoginView(APIView):
         else:
             return Response({"error": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -231,7 +234,7 @@ class LogoutView(APIView):
         request.user.auth_token.delete()
         return Response({"message": "Logged out successfully."}, status=status.HTTP_200_OK)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class ForgotPasswordView(APIView):
     def post(self, request):
         """
@@ -273,7 +276,7 @@ class ForgotPasswordView(APIView):
 
         return Response({"message": "OTP sent to your email and phone number."}, status=status.HTTP_200_OK)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class ResetPasswordView(APIView):
     def post(self, request):
         """
@@ -303,7 +306,7 @@ class ResetPasswordView(APIView):
 
         return Response({"message": "Password has been successfully reset."}, status=status.HTTP_200_OK)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class GoogleAppleAuthView(APIView):
     def post(self, request):
         data = request.data
