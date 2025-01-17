@@ -47,8 +47,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',  # Add this for DRF setup
     'rest_framework.authtoken',
-    'coreapi',  # Coreapi for coreapi documentation
-    'drf_yasg',  # drf_yasg for Swagger documentation
+    # 'coreapi',  # Coreapi for coreapi documentation
+    # 'drf_yasg',  # drf_yasg for Swagger documentation
     'channels',
     'django_filters',
 ]
@@ -56,7 +56,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.http.ConditionalGetMiddleware',
     'django.middleware.common.BrokenLinkEmailsMiddleware',
@@ -179,7 +179,7 @@ REST_FRAMEWORK = {
     #     ],
 }
 
-SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
+# SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
 SECURE_HSTS_SECONDS = 31536000  # Enable HSTS (1 year)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # Include subdomains
 SECURE_HSTS_PRELOAD = True  # Allow browsers to preload HSTS
@@ -204,12 +204,6 @@ CHANNEL_LAYERS = {
         },
     },
 }
-
-AUTHENTICATION_BACKENDS = (
-    'social_core.backends.google.GoogleOAuth2',
-    'social_core.backends.apple.AppleIdAuth',
-    'django.contrib.auth.backends.ModelBackend',
-)
 
 AUTH_USER_MODEL = 'auth_app.User'
 

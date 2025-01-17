@@ -16,24 +16,24 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from drf_yasg import openapi
-from drf_yasg.views import get_schema_view
+# from drf_yasg import openapi
+# from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 from rest_framework.documentation import include_docs_urls
 
 # Swagger documentation setup
-schema_view = get_schema_view(
-    openapi.Info(
-        title="AgbaDo API",
-        default_version='v1',
-        description="AgbaDo API",
-        terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="contact@agbadoapi.local"),
-        license=openapi.License(name="MIT License"),
-    ),
-    public=True,
-    permission_classes=[permissions.AllowAny],
-)
+# # schema_view = get_schema_view(
+#     openapi.Info(
+#         title="AgbaDo API",
+#         default_version='v1',
+#         description="AgbaDo API",
+#         terms_of_service="https://www.google.com/policies/terms/",
+#         contact=openapi.Contact(email="contact@agbadoapi.local"),
+#         license=openapi.License(name="MIT License"),
+#     ),
+#     public=True,
+#     permission_classes=[permissions.AllowAny],
+# )
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -43,7 +43,7 @@ urlpatterns = [
     path('service/', include('service_app.urls')),  # Include the service app URLs
     path('user/', include('user_app.urls')),  # Include the user app URLs
     path('notification/', include('notification_app.urls')),  # Include the notification app URLs
-    path('docs/', include_docs_urls(title='AgbaDo API Documentation', public=True)),
-    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    # path('docs/', include_docs_urls(title='AgbaDo API Documentation', public=True)),
+    # path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    # path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 ]

@@ -334,26 +334,3 @@ class GoogleAppleAuthView(APIView):
         except CustomUser.DoesNotExist:
             # If user doesn't exist, register them
             return redirect('register')  # Redirect to the Register view (you can handle this in frontend)
-
-    def post(self, request):
-        code = request.data.get("code")
-        if not code:
-            return Response({"error": "Authorization code is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            id_token = get_apple_user_info(settings.APPLE_CLIENT_ID, code)
-            decoded_token = jwt.decode(id_token, options={"verify_signature": False})
-            email = decoded_token.get("email", None)
-
-            if not email:
-                return Response({"error": "Apple ID token did not contain email"}, status=status.HTTP_400_BAD_REQUEST)
-
-            user, _ = CustomUser.objects.get_or_create(email=email)
-            user.is_verified = True
-            user.save()
-
-            auth_token, _ = Token.objects.get_or_create(user=user)
-            return Response({"token": auth_token.key}, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

@@ -76,8 +76,8 @@ class OTP(models.Model):
         return f"OTP for {self.user.email} - {'Used' if self.is_used else 'Not Used'}"
 
 class Referral(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="referral")
-    referer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="referral")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="referral_user")
+    referer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="referral_referer")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
