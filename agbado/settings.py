@@ -24,9 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=lambda v: [s.strip() for s in v.split(',')])
 
 # Application definition
 
@@ -179,7 +179,7 @@ REST_FRAMEWORK = {
     #     ],
 }
 
-# SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
+SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
 SECURE_HSTS_SECONDS = 31536000  # Enable HSTS (1 year)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # Include subdomains
 SECURE_HSTS_PRELOAD = True  # Allow browsers to preload HSTS
@@ -212,16 +212,6 @@ AUTHENTICATION_BACKENDS = (
 )
 
 AUTH_USER_MODEL = 'auth_app.User'
-
-GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID')
-GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET')
-GOOGLE_REDIRECT_URI = config('GOOGLE_REDIRECT_URI')
-
-APPLE_CLIENT_ID = config('APPLE_CLIENT_ID')
-APPLE_TEAM_ID = config('APPLE_TEAM_ID')
-APPLE_KEY_ID = config('APPLE_KEY_ID')
-APPLE_REDIRECT_URI = config('APPLE_REDIRECT_URI')
-APPLE_PRIVATE_KEY_PATH = config('APPLE_PRIVATE_KEY_PATH')
 
 TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN')
