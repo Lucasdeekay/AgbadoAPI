@@ -13,7 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from agbado import settings
 from .serializers import UserSerializer
 from .models import User as CustomUser, OTP, Referral
-from .utils import create_otp, send_otp_email, send_otp_sms
+from .utils import create_otp, send_otp_email, send_otp_sms, write_to_file
 
 
 def get_user_from_token(request):
@@ -38,42 +38,41 @@ class RegisterView(APIView):
         """
         Register a new user. Either email or phone number is required.
         """
-        print(request)
-        try:
-            first_name = request.data.get('first_name')
-            last_name = request.data.get('last_name')
-            email = request.data.get('email')
-            phone_number = request.data.get('phone_number')
-            state = request.data.get('state')
-            password = request.data.get('password')
-            referral_code = request.data.get('referral_code')
+        write_to_file('log.txt', f'{request}')
+        first_name = request.data.get('first_name')
+        last_name = request.data.get('last_name')
+        email = request.data.get('email')
+        phone_number = request.data.get('phone_number')
+        state = request.data.get('state')
+        password = request.data.get('password')
+        referral_code = request.data.get('referral_code')
 
-            if not email or not phone_number or not password:
-                return Response({"error": "Email, phone number, and password are required."},
-                                status=status.HTTP_400_BAD_REQUEST)
+        if not email or not phone_number or not password:
+            return Response({"error": "Email, phone number, and password are required."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-            if CustomUser.objects.filter(email=email).exists():
-                return Response({"error": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+        if CustomUser.objects.filter(email=email).exists():
+            return Response({"error": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
-            if CustomUser.objects.filter(phone_number=phone_number).exists():
-                return Response({"error": "A user with this phone number already exists."},
-                                status=status.HTTP_400_BAD_REQUEST)
+        if CustomUser.objects.filter(phone_number=phone_number).exists():
+            return Response({"error": "A user with this phone number already exists."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-            if CustomUser.objects.filter(referral_code=referral_code).exists():
-                referer = CustomUser.objects.get(referral_code=referral_code)
-                Referral.objects.create(user=user, referer=referer)
+        if CustomUser.objects.filter(referral_code=referral_code).exists():
+            referer = CustomUser.objects.get(referral_code=referral_code)
+            Referral.objects.create(user=user, referer=referer)
 
-            user_data = {
-                'first_name': first_name,
-                'last_name': last_name,
-                'email': email,
-                'phone_number': phone_number,
-                'state': state,
-                'password': password
-            }
-            serializer = UserSerializer(data=user_data)
+        user_data = {
+            'first_name': first_name,
+            'last_name': last_name,
+            'email': email,
+            'phone_number': phone_number,
+            'state': state,
+            'password': password
+        }
+        serializer = UserSerializer(data=user_data)
 
-            if serializer.is_valid():
+        if serializer.is_valid():
             user = serializer.save()
             user.set_password(password)
             user.save()
@@ -94,8 +93,8 @@ class RegisterView(APIView):
                 "token": token.key,
                 "user": serializer.data
             }, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response(e, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SendOTPView(APIView):

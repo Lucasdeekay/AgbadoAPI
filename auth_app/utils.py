@@ -33,3 +33,21 @@ def send_otp_sms(user, otp):
         to=user.phone_number
     )
     return message.sid
+
+
+def write_to_file(file_path, message, error=None):
+    """
+    Writes a message and an optional error to a file.
+    
+    :param file_path: Path to the file where logs will be written.
+    :param message: The main message to write.
+    :param error: (Optional) Error message to log.
+    """
+    try:
+        with open(file_path, "a") as file:
+            file.write(f"Message: {message}\n")
+            if error:
+                file.write(f"Error: {error}\n")
+            file.write("-" * 50 + "\n")  # Separator for readability
+    except Exception as e:
+        print(f"Failed to write to file: {e}")
