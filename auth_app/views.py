@@ -38,12 +38,10 @@ class RegisterView(APIView):
         """
         Register a new user. Either email or phone number is required.
         """
-        write_to_file('log.txt', f'{request.data}')
-
         first_name = request.data.get('first_name')
         last_name = request.data.get('last_name')
         email = request.data.get('email')
-        phone_number = request.data.get('phone_number')
+        phone_number = request.data.get('phone')
         state = request.data.get('state')
         password = request.data.get('password')
         referral_code = request.data.get('referral_code')
