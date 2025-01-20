@@ -83,9 +83,11 @@ class RegisterView(APIView):
             otp_instance = create_otp(user)
             otp = otp_instance.otp
 
+            write_to_file(user_data.phone_number)
+
             # Send OTP to email and phone
-            send_otp_email(email, otp)
-            send_otp_sms(phone_number, otp)
+            send_otp_email(user_data.email, otp)
+            send_otp_sms(user_data.phone_number, otp)
 
             token, created = Token.objects.get_or_create(user=user)
             return Response({
