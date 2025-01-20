@@ -20,10 +20,10 @@ def create_otp(user):
 
 
 # Send OTP via email
-def send_otp_email(email, otp):
+def send_otp_email(user, otp):
     subject = 'Your OTP for password reset'
     message = f'Your OTP to reset your password is: {otp}'
-    send_mail(subject, message, settings.EMAIL_HOST_USER, [email])
+    send_mail(subject, message, settings.EMAIL_HOST_USER, [user.email])
 
 
 # Send OTP via phone number (using Twilio as an example)
@@ -42,10 +42,11 @@ def format_phone_number(phone_number: str) -> str:
 
     return f"{phone_number}"
 
-def send_otp_sms(phone_number, otp):
+def send_otp_sms(user, otp):
     client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
     
-    formatted_number = format_phone_number(phone_number)  # Format number
+    formatted_number = format_phone_number(user.phone_number)  # Format number
+
 
     message = client.messages.create(
         body=f'Your OTP to reset your password is: {otp}',
