@@ -45,13 +45,12 @@ def format_phone_number(phone_number: str) -> str:
 def send_otp_sms(user, otp):
     client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
     
-    formatted_number = format_phone_number(user.phone_number)  # Format number
-
+    # formatted_number = format_phone_number(user.phone_number)  # Format number
 
     message = client.messages.create(
         body=f'Your OTP to reset your password is: {otp}',
         from_=settings.TWILIO_PHONE_NUMBER,
-        to=formatted_number  # Use formatted number
+        to=user.phone_number
     )
     return message.sid
 
