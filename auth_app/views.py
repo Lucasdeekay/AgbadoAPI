@@ -85,7 +85,9 @@ class RegisterView(APIView):
 
             # Send OTP to email and phone
             send_otp_email(user, otp)
-            send_otp_sms(user, otp)
+
+            # TODO: Twilio not working properly yet
+            # send_otp_sms(user, otp)
 
             token, created = Token.objects.get_or_create(user=user)
             return Response({
@@ -203,6 +205,8 @@ class LoginView(APIView):
                     user = None
             except CustomUser.DoesNotExist:
                 user = None
+
+        write_to_file('log.txt', f'{user}')
 
         if user is not None:
             login(request, user)
