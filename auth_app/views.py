@@ -85,14 +85,9 @@ class RegisterView(APIView):
 
             user = CustomUser.objects.filter(email=email)
 
-            write_to_file('log.txt', f'user: {user}')
-            write_to_file('log.txt', f'userData: {user_data}')
-            write_to_file('log.txt', f'phone no: {phone_number}')
-            write_to_file('log.txt', f'email: {email}')
-
             # Send OTP to email and phone
-            send_otp_email(user, otp)
-            send_otp_sms(user, otp)
+            send_otp_email(user_data["email"], otp)
+            send_otp_sms(user_data["phone_number"], otp)
 
             token, created = Token.objects.get_or_create(user=user)
             return Response({
