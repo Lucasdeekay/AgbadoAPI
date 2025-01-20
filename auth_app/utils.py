@@ -1,4 +1,5 @@
 import random
+import re
 from django.core.mail import send_mail
 from twilio.rest import Client
 
@@ -26,12 +27,30 @@ def send_otp_email(user, otp):
 
 
 # Send OTP via phone number (using Twilio as an example)
+def format_phone_number(phone_number: str) -> str:
+    """Format phone number to E.164 standard (e.g., +2349024563447)"""
+    phone_number = phone_number.strip()  # Remove spaces
+    phone_number = re.sub(r"\D", "", phone_number)  # Remove non-digit characters
+
+    # Remove leading 0 if it starts with 0
+    if phone_number.startswith("0"):
+        phone_number = phone_number[1:]
+
+    # Ensure it starts with +234 (Nigeria)
+    if not phone_number.startswith("+234"):
+        phone_number = "+234" + phone_number
+
+    return f"{phone_number}"
+
 def send_otp_sms(user, otp):
     client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+    
+    formatted_number = format_phone_number(user.phone_number)  # Format number
+
     message = client.messages.create(
         body=f'Your OTP to reset your password is: {otp}',
         from_=settings.TWILIO_PHONE_NUMBER,
-        to=user.phone_number
+        to=formatted_number  # Use formatted number
     )
     return message.sid
 
