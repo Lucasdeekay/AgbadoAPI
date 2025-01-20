@@ -6,7 +6,7 @@ from .models import User, KYC, OTP, Referral
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'phone_number', 'password']
+        fields = "__all__"
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
@@ -19,16 +19,15 @@ class UserSerializer(serializers.ModelSerializer):
 class KYCSerializer(serializers.ModelSerializer):
     class Meta:
         model = KYC
-        fields = (
-            'user', 'status', 'national_id', 'bvn', 'driver_license', 'proof_of_address', 'updated_at', 'verified_at')
+        fields = "__all__"
 
 
 class OTPSerializer(serializers.ModelSerializer):
     class Meta:
         model = OTP
-        fields = ('user', 'otp', 'created_at', 'is_used')
+        fields = "__all__"
 
 class ReferralSerializer(serializers.ModelSerializer):
     class Meta:
         model = Referral
-        fields = ('user', 'referer', 'created_at',)
+        fields = "__all__"

@@ -76,7 +76,7 @@ class RegisterView(APIView):
             user.set_password(password)
             user.save()
 
-            user.is_active = False  # Deactivate account until verification
+            # user.is_active = False  # Deactivate account until verification
             user.save()
 
             # Generate and send OTP
