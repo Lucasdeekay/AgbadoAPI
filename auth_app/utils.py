@@ -47,8 +47,6 @@ def send_otp_sms(user, otp):
     
     formatted_number = format_phone_number(user.phone_number)  # Format number
 
-    write_to_file(format_phone_number)
-
     message = client.messages.create(
         body=f'Your OTP to reset your password is: {otp}',
         from_=settings.TWILIO_PHONE_NUMBER,
