@@ -1,7 +1,8 @@
 import random
 from django.core.mail import send_mail
 from twilio.rest import Client
-from django.conf import settings
+
+from agbado import settings
 from .models import OTP
 
 
