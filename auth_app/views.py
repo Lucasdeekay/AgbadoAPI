@@ -83,7 +83,7 @@ class RegisterView(APIView):
             otp_instance = create_otp(user)
             otp = otp_instance.otp
 
-            write_to_file(phone_number)
+            write_to_file('log.txt', phone_number)
 
             # Send OTP to email and phone
             send_otp_email(email, otp)
