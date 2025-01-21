@@ -4,14 +4,15 @@ from django.views.decorators.csrf import csrf_exempt
 
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from auth_app.views import get_user_from_token
 from provider_app.models import ServiceProvider
 from provider_app.serializers import ServiceProviderSerializer
-from service_app.models import SubService, Service, Booking
-from service_app.serializers import ServiceSerializer, SubServiceSerializer
+from service_app.models import ServiceRequest, ServiceRequestBid, SubService, Service, Booking
+from service_app.serializers import BookingSerializer, ServiceRequestBidSerializer, ServiceSerializer, SubServiceSerializer
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ServiceProviderDetailsView(APIView):
@@ -131,3 +132,84 @@ class EditSubServiceView(APIView):
             return Response({"message": "Subservice updated successfully.", "subservice": serializer.data},
                             status=status.HTTP_200_OK)
         return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ServiceProviderBookingsView(APIView):
+    authentication_classes = [TokenAuthentication]
+
+    # permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        service_provider = get_user_from_token(request)  # Assuming the authenticated user is a service provider
+        bookings = Booking.objects.filter(service_provider=service_provider)
+        serializer = BookingSerializer(bookings, many=True)
+        return Response({'bookings': serializer.data})
+    
+@method_decorator(csrf_exempt, name='dispatch')
+class ServiceProviderBidsView(APIView):
+    authentication_classes = [TokenAuthentication]
+
+    # permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        service_provider = get_user_from_token(request)  # Assuming the authenticated user is a service provider
+        bids = ServiceRequestBid.objects.filter(service_provider=service_provider)
+        serializer = ServiceRequestBidSerializer(bids, many=True)
+        return Response({'requests': serializer.data})
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SubmitBidView(APIView):
+    authentication_classes = [TokenAuthentication]
+
+    # permission_classes = [IsAuthenticated]
+    
+    def post(self, request, service_request_id, *args, **kwargs):
+        service_provider = get_user_from_token(request)
+        try:
+            service_request = ServiceRequest.objects.get(id=service_request_id)
+        except ServiceRequest.DoesNotExist:
+            raise NotFound("Service request not found")
+        
+        data = request.data.copy()
+        data['service_request'] = service_request.id
+        data['service_provider'] = service_provider.id
+        
+        serializer = ServiceRequestBidSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CancelBookingView(APIView):
+    authentication_classes = [TokenAuthentication]
+
+    # permission_classes = [IsAuthenticated]
+    
+    def post(self, request, booking_id, *args, **kwargs):
+        service_provider = get_user_from_token(request)
+        try:
+            booking = Booking.objects.get(id=booking_id, service_provider=service_provider)
+        except Booking.DoesNotExist:
+            raise NotFound("Booking not found")
+        
+        booking.provider_status = 'Cancelled'
+        booking.save()
+        return Response({"message": "Booking cancelled successfully"}, status=status.HTTP_200_OK)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CompleteBookingView(APIView):
+    authentication_classes = [TokenAuthentication]
+
+    # permission_classes = [IsAuthenticated]
+    
+    def post(self, request, booking_id, *args, **kwargs):
+        service_provider = get_user_from_token(request)
+        try:
+            booking = Booking.objects.get(id=booking_id, service_provider=service_provider)
+        except Booking.DoesNotExist:
+            raise NotFound("Booking not found")
+        
+        booking.provider_status = 'Completed'
+        booking.save()
+        return Response({"message": "Booking completed successfully"}, status=status.HTTP_200_OK)
