@@ -41,7 +41,7 @@ class DashboardView(APIView):
 
         try:
             # Fetch wallet details
-            wallet = Wallet.objects.get(user=user)
+            wallet = Wallet.objects.get_or_create(user=user)
             wallet_data = {
                 "balance": wallet.balance,
                 "last_updated": wallet.updated_at,
