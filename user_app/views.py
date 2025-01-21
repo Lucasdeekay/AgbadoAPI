@@ -50,22 +50,19 @@ class DashboardView(APIView):
             return Response({"error": "Wallet not found for this user."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": f"Error fetching wallet details: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        
         try:
             # Fetch last 5 transactions
             transactions = Transaction.objects.filter(wallet=wallet).order_by('-created_at')[:5]
             transactions_data = TransactionSerializer(transactions, many=True).data
         except Exception as e:
-            return Response({"error": f"Error fetching transactions: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            transactions_data = []
 
         try:
             # Check if the user has any unread notifications
             has_unread_notifications = Notification.objects.filter(user=user, is_read=False).exists()
-        except DatabaseError:
-            return Response({"error": "Error checking notifications."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            return Response({"error": f"Error fetching notification status: {str(e)}"},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            has_unread_notifications = False
 
             # Combine data into response
         response_data = {
