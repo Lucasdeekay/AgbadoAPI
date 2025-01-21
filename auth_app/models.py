@@ -61,7 +61,7 @@ class KYC(models.Model):
 
 class OTP(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    otp = models.CharField(max_length=6)
+    otp = models.CharField(max_length=5)
     created_at = models.DateTimeField(auto_now_add=True)
     is_used = models.BooleanField(default=False)
 

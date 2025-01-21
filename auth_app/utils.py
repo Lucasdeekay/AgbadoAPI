@@ -9,7 +9,7 @@ from .models import OTP
 
 # Generate OTP
 def generate_otp():
-    return str(random.randint(100000, 999999))
+    return str(random.randint(10000, 99999))
 
 
 # Create OTP in the database
