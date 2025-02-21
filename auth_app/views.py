@@ -18,19 +18,54 @@ from .utils import create_otp, send_otp_email, send_otp_sms, write_to_file
 
 def get_user_from_token(request):
     """
-    Extracts the user from the token in the Authorization header.
+    Extracts the user from the token in the Authorization header.  Does NOT delete the token.
 
     :param request: The current request object
     :return: The user associated with the token
     :raises: AuthenticationFailed if token is invalid or missing
     """
     try:
-        token = request.headers.get('Authorization', '').split(' ')[1]
-        token = Token.objects.get(key=token)
-        return token.user
-    except Exception:
-        raise AuthenticationFailed('Invalid token')
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header:
+            raise AuthenticationFailed('Authorization header missing')
 
+        parts = auth_header.split()
+        if len(parts) != 2 or parts[0].lower() != 'token':
+            raise AuthenticationFailed('Invalid Authorization header format')
+
+        token_key = parts[1]
+        token = Token.objects.get(key=token_key)
+        return token.user
+
+    except Token.DoesNotExist:
+        raise AuthenticationFailed('Invalid token')
+    except (IndexError, ValueError):
+        raise AuthenticationFailed('Invalid Authorization header format')
+
+def delete_token(request):
+    """
+    Deletes the token from the Authorization header.
+
+    :param request: The current request object
+    :raises: AuthenticationFailed if token is invalid or missing
+    """
+    try:
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header:
+            raise AuthenticationFailed('Authorization header missing')
+
+        parts = auth_header.split()
+        if len(parts) != 2 or parts[0].lower() != 'token':
+            raise AuthenticationFailed('Invalid Authorization header format')
+
+        token_key = parts[1]
+        token = Token.objects.get(key=token_key)
+        token.delete()
+
+    except Token.DoesNotExist:
+        raise AuthenticationFailed('Invalid token')
+    except (IndexError, ValueError):
+        raise AuthenticationFailed('Invalid Authorization header format')
 
 @method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(APIView):
@@ -222,9 +257,13 @@ class LogoutView(APIView):
         """
         Logout the user and delete their token.
         """
-        logout(request)
-        request.user.auth_token.delete()
-        return Response({"message": "Logged out successfully."}, status=status.HTTP_200_OK)
+        try:
+            user = get_user_from_token(request)  # Get the user (no deletion here)
+            delete_token(request)             # Explicitly delete the token
+            logout(request)  # Django's logout
+            return Response({"message": "Logged out successfully."}, status=status.HTTP_200_OK)
+        except AuthenticationFailed as e:
+            return Response({'detail': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ForgotPasswordView(APIView):
