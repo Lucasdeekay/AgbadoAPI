@@ -11,6 +11,8 @@ class NotificationAdmin(admin.ModelAdmin):
     search_fields = ('user__email', 'title', 'created_at', 'is_read')
     list_filter = ('is_read',)
     ordering = ('-created_at',)
+    readonly_fields = ('created_at',)  # Add this to allow display but not editing
+    actions = ['send_notification_to_all']  # Ensure this is included
 
     def send_notification_to_all(self, request, queryset):
         if queryset.count() != 1:

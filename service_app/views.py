@@ -15,7 +15,7 @@ from service_app.models import ServiceRequest, ServiceRequestBid, SubService, Se
 from service_app.serializers import BookingSerializer, ServiceRequestBidSerializer, ServiceSerializer, SubServiceSerializer
 
 @method_decorator(csrf_exempt, name='dispatch')
-class ServiceProviderDetailsView(APIView):
+class GetAllServicesDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
 
     # permission_classes = [IsAuthenticated]
@@ -25,7 +25,7 @@ class ServiceProviderDetailsView(APIView):
             user = get_user_from_token(request)
 
             # Fetch service provider details
-            service_provider = get_object_or_404(ServiceProvider, user=user)
+            service_provider = ServiceProvider.objects.get(user=user)
             provider_data = ServiceProviderSerializer(service_provider).data
 
             # Fetch services provided by the service provider
@@ -33,7 +33,7 @@ class ServiceProviderDetailsView(APIView):
             services_data = ServiceSerializer(services, many=True).data
 
             # Fetch reviews from the Booking model
-            bookings = Booking.objects.filter(service_provider=service_provider).exclude(feedback=None)
+            bookings = Booking.objects.filter(service_provider=service_provider.user).exclude(feedback=None)
             reviews_data = bookings.values(
                 'user__email',  # Reviewer email
                 'feedback',  # Review text

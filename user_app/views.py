@@ -53,7 +53,7 @@ class DashboardView(APIView):
         
         try:
             # Fetch last 5 transactions
-            transactions = Transaction.objects.filter(wallet=wallet).order_by('-created_at')[:5]
+            transactions = Transaction.objects.filter(user=user).order_by('-created_at')[:5]
             transactions_data = TransactionSerializer(transactions, many=True).data
         except Exception as e:
             transactions_data = []

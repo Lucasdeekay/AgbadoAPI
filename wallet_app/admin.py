@@ -16,6 +16,7 @@ class TransactionAdmin(admin.ModelAdmin):
     search_fields = ('user__email', 'transaction_type')
     list_filter = ('transaction_type', 'status')
     ordering = ('-created_at',)
+    readonly_fields = ('created_at',)  # Add this to allow display but not editing
 
 
 class WithdrawalAdmin(admin.ModelAdmin):
@@ -23,6 +24,7 @@ class WithdrawalAdmin(admin.ModelAdmin):
     list_filter = ['status', 'created_at']
     search_fields = ['user__email', 'bank_name', 'account_number']
     ordering = ['-created_at']
+    readonly_fields = ('created_at',)  # Add this to allow display but not editing
 
 
 admin.site.register(Wallet, WalletAdmin)

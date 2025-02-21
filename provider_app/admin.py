@@ -4,13 +4,12 @@ from .models import ServiceProvider
 
 # Registering the ServiceProvider model with custom admin interface
 class ServiceProviderAdmin(admin.ModelAdmin):
-    list_display = (
-        'user', 'company_name', 'company_address', 'company_phone_no', 'company_email',
-        'business_category', 'avg_rating', 'rating_population', 'is_approved', 'created_at'
-    )
+    list_display = ('user', 'company_name', 'company_address', 'company_phone_no', 'company_email',
+        'business_category', 'avg_rating', 'rating_population', 'is_approved', 'created_at')
     search_fields = ('user__email', 'company_name', 'company_email')
     list_filter = ('is_approved', 'business_category')
     ordering = ('-created_at',)
+    readonly_fields = ('created_at',)  # Add this to allow display but not editing
 
     # Customizing the form display for more comprehensive fields
     fieldsets = (

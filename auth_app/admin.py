@@ -16,6 +16,7 @@ class KYCAdmin(admin.ModelAdmin):
     search_fields = ('user__email', 'status')
     list_filter = ('status',)
     ordering = ('-updated_at',)
+    readonly_fields = ('updated_at',)  # Add this to allow display but not editing
 
 
 class OTPAdmin(admin.ModelAdmin):
@@ -23,11 +24,13 @@ class OTPAdmin(admin.ModelAdmin):
     search_fields = ('user__email', 'is_used')
     list_filter = ('is_used',)
     ordering = ('-created_at',)
+    readonly_fields = ('created_at',)  # Add this to allow display but not editing
 
 class ReferralAdmin(admin.ModelAdmin):
     list_display = ('user', 'referer', 'created_at',)
     search_fields = ('user__email',)
     ordering = ('-created_at',)
+    readonly_fields = ('created_at',)  # Add this to allow display but not editing
 
 
 admin.site.register(User, UserAdmin)

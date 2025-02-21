@@ -80,7 +80,7 @@ class CreateServiceProviderView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class EditServiceProviderView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def put(self, request):
         user = get_user_from_token(request)
@@ -154,7 +154,7 @@ class EditServiceProviderView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class GetServiceProviderDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = get_user_from_token(request)

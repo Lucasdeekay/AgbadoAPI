@@ -11,6 +11,7 @@ class DailyTaskAdmin(admin.ModelAdmin):
     search_fields = ('title', 'description', 'task_type')
     list_filter = ('is_active', 'task_type')
     ordering = ('-created_at',)
+    readonly_fields = ('created_at',)  # Add this to allow display but not editing
 
 
 # Registering the TaskCompletion model with custom admin interface
@@ -34,6 +35,7 @@ class UserActivityAdmin(admin.ModelAdmin):
     search_fields = ('user__email', 'activity_type')
     list_filter = ('activity_type',)
     ordering = ('-created_at',)
+    readonly_fields = ('created_at',)  # Add this to allow display but not editing
 
 
 # Registering the LeisureAccess model with custom admin interface
