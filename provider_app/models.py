@@ -12,8 +12,8 @@ class ServiceProvider(models.Model):
     company_email = models.EmailField()
     business_category = models.CharField(max_length=100)
     company_logo = models.ImageField(upload_to='company_logos/', null=True, blank=True)
-    opening_hour = models.CharField(max_length=5)
-    closing_hour = models.CharField(max_length=5)
+    opening_hour = models.CharField(max_length=10)
+    closing_hour = models.CharField(max_length=10)
     avg_rating = models.PositiveIntegerField(default=0, null=True, blank=True)
     rating_population = models.PositiveIntegerField(default=0, null=True, blank=True)
     is_approved = models.BooleanField(default=False)  # Indicates admin approval for service providers

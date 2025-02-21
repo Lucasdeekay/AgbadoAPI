@@ -21,35 +21,41 @@ class GetAllServicesDetailsView(APIView):
     # permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # Get the service provider profile
         try:
             user = get_user_from_token(request)
-
-            # Fetch service provider details
-            service_provider = ServiceProvider.objects.get(user=user)
-            provider_data = ServiceProviderSerializer(service_provider).data
-
-            # Fetch services provided by the service provider
-            services = Service.objects.filter(provider=service_provider)
-            services_data = ServiceSerializer(services, many=True).data
-
-            # Fetch reviews from the Booking model
-            bookings = Booking.objects.filter(service_provider=service_provider.user).exclude(feedback=None)
-            reviews_data = bookings.values(
-                'user__email',  # Reviewer email
-                'feedback',  # Review text
-                'rating',  # Review rating
-                'created_at'  # Date of review
+            service_provider = user.provider_profile
+        except ServiceProvider.DoesNotExist:
+            return Response(
+                {"message": "No service provider profile found."},
+                status=status.HTTP_200_OK,  # Return success with an empty response
             )
+        
+            
+        # Fetch service provider details
+        service_provider = ServiceProvider.objects.get(user=user)
+        provider_data = ServiceProviderSerializer(service_provider).data
 
-            return Response({
-                "provider_details": provider_data,
-                "services": services_data,
-                "reviews": reviews_data
-            }, status=status.HTTP_200_OK)
+        # Fetch services provided by the service provider
+        services = Service.objects.filter(provider=service_provider)
+        services_data = ServiceSerializer(services, many=True).data
 
-        except Exception as e:
-            return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Fetch reviews from the Booking model
+        bookings = Booking.objects.filter(service_provider=service_provider.user).exclude(feedback=None)
+        reviews_data = bookings.values(
+            'user__email',  # Reviewer email
+            'feedback',  # Review text
+            'rating',  # Review rating
+            'created_at'  # Date of review
+        )
 
+        return Response({
+            "provider_details": provider_data,
+            "services": services_data,
+            "reviews": reviews_data
+        }, status=status.HTTP_200_OK)
+
+        
 @method_decorator(csrf_exempt, name='dispatch')
 class ServiceDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
