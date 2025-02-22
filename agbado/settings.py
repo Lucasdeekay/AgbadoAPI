@@ -179,7 +179,7 @@ REST_FRAMEWORK = {
     #     ],
 }
 
-# SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
+SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
 SECURE_HSTS_SECONDS = 31536000  # Enable HSTS (1 year)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # Include subdomains
 SECURE_HSTS_PRELOAD = True  # Allow browsers to preload HSTS

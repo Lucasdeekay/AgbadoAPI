@@ -87,6 +87,8 @@ class UpdateUserProfileView(APIView):
         state = request.data.get('state')
         profile_picture = request.FILES.get('profile_picture')
 
+        print(phone_number, state, profile_picture)
+
         # Handle empty requests gracefully
         if not phone_number and not state and not profile_picture:
             return Response(
