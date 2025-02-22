@@ -80,7 +80,7 @@ class UpdateUserProfileView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
 
-    def put(self, request):
+    def post(self, request):
         user = get_user_from_token(request)
 
         # Extract data from the request
@@ -129,7 +129,7 @@ class UpdateKYCView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
 
-    def put(self, request):
+    def post(self, request):
         user = get_user_from_token(request)
 
         # Retrieve the user's KYC record

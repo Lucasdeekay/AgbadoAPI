@@ -82,7 +82,7 @@ class EditServiceProviderView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
 
-    def put(self, request):
+    def post(self, request):
         user = get_user_from_token(request)
 
         # Get the service provider profile

@@ -115,7 +115,7 @@ class EditServiceView(APIView):
 
     # permission_classes = [IsAuthenticated]
 
-    def put(self, request, service_id):
+    def post(self, request, service_id):
         service = get_object_or_404(Service, id=service_id)
         serializer = ServiceSerializer(service, data=request.data, partial=True)
         if serializer.is_valid():
@@ -130,7 +130,7 @@ class EditSubServiceView(APIView):
 
     # permission_classes = [IsAuthenticated]
 
-    def put(self, request, subservice_id):
+    def post(self, request, subservice_id):
         subservice = get_object_or_404(SubService, id=subservice_id)
         serializer = SubServiceSerializer(subservice, data=request.data, partial=True)
         if serializer.is_valid():
