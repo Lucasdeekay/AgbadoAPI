@@ -11,6 +11,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
 from agbado import settings
+from notification_app.models import Notification
 from .serializers import UserSerializer
 from .models import User as CustomUser, OTP, Referral
 from .utils import create_otp, send_otp_email, send_otp_sms, write_to_file
@@ -319,6 +320,8 @@ class ResetPasswordView(APIView):
         user.set_password(new_password)
         user.save()
 
+        Notification.objects.create(user=user, title="Password Reset Successful", message="Your password has been successfully reset.")
+
         return Response({"message": "Password has been successfully reset."}, status=status.HTTP_200_OK)
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -340,6 +343,9 @@ class GoogleAppleAuthView(APIView):
             user = CustomUser.objects.get(email=email)
             # If user exists, login and return data
             login(request, user)
+
+            Notification.objects.create(user=user, title="Login Successful", message="You have successfully logged in via Google/Apple.")
+            
             return Response({
                 "message": "Login successful",
                 "user": {

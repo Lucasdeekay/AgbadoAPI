@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from auth_app.views import get_user_from_token
+from notification_app.models import Notification
 from provider_app.models import ServiceProvider
 from provider_app.serializers import ServiceProviderSerializer
 from service_app.models import ServiceRequest, ServiceRequestBid, SubService, Service, Booking
@@ -157,6 +158,12 @@ class AddServiceView(APIView):
                 'created_at': service.created_at.isoformat(),
             }
 
+            Notification.objects.create(
+                user=user,
+                title="New Service Added",
+                message=f"You have added a new service: {service.name}"
+            )
+
             return Response({"message": "Service added successfully.", "service": service_data}, status=status.HTTP_201_CREATED)
 
         except Exception as e:
@@ -168,6 +175,8 @@ class AddSubServiceView(APIView):
 
     def post(self, request, service_id):
         try:
+            user = get_user_from_token(request)
+
             service = get_object_or_404(Service, id=service_id)
 
             name = request.data.get('name')
@@ -195,6 +204,12 @@ class AddSubServiceView(APIView):
                 'created_at': subservice.created_at.isoformat(),
             }
 
+            Notification.objects.create(
+                user=user,
+                title="New Service Added",
+                message=f"You have added a new service: {service.name}"
+            )
+
             return Response({"message": "Subservice added successfully.", "subservice": subservice_data}, status=status.HTTP_201_CREATED)
 
         except Exception as e:
@@ -206,6 +221,8 @@ class EditServiceView(APIView):
 
     def post(self, request, service_id):
         try:
+            user = get_user_from_token(request)
+
             service = get_object_or_404(Service, id=service_id)
 
             service.name = request.data.get('name', service.name)
@@ -231,6 +248,12 @@ class EditServiceView(APIView):
                 'created_at': service.created_at.isoformat(),
             }
 
+            Notification.objects.create(
+            user=user,
+            title="Service Updated",
+            message=f"You have updated the service: {service.name}"
+        )
+
             return Response({"message": "Service updated successfully.", "service": service_data}, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -242,6 +265,8 @@ class EditSubServiceView(APIView):
 
     def post(self, request, subservice_id):
         try:
+            user = get_user_from_token(request)
+
             subservice = get_object_or_404(SubService, id=subservice_id)
 
             subservice.service = get_object_or_404(Service, id=request.data.get('service'))
@@ -263,6 +288,12 @@ class EditSubServiceView(APIView):
                 'image': subservice.image.url if subservice.image else None,
                 'created_at': subservice.created_at.isoformat(),
             }
+
+            Notification.objects.create(
+            user=user,
+            title="Subservice Updated",
+            message=f"You have updated the subservice: {subservice.name}"
+        )
 
             return Response({"message": "Subservice updated successfully.", "subservice": subservice_data}, status=status.HTTP_200_OK)
 
@@ -313,6 +344,13 @@ class SubmitBidView(APIView):
         serializer = ServiceRequestBidSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
+
+            Notification.objects.create(
+            user=service_provider,
+            title="Bid Submitted",
+            message=f"You have submitted a bid for service request: {service_request.title}"
+        )
+            
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -331,6 +369,13 @@ class CancelBookingView(APIView):
         
         booking.provider_status = 'Cancelled'
         booking.save()
+
+        Notification.objects.create(
+        user=service_provider,
+        title="Booking Cancelled",
+        message=f"You have cancelled booking: {booking.service_request.title}"
+    )
+        
         return Response({"message": "Booking cancelled successfully"}, status=status.HTTP_200_OK)
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -348,4 +393,11 @@ class CompleteBookingView(APIView):
         
         booking.provider_status = 'Completed'
         booking.save()
+
+        Notification.objects.create(
+        user=service_provider,
+        title="Booking Completed",
+        message=f"You have completed booking: {booking.service_request.title}"
+    )
+        
         return Response({"message": "Booking completed successfully"}, status=status.HTTP_200_OK)

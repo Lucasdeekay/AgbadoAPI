@@ -11,6 +11,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
 from auth_app.views import get_user_from_token
+from notification_app.models import Notification
 from wallet_app.models import Wallet, Transaction, Withdrawal
 from wallet_app.serializers import TransactionSerializer, WithdrawalSerializer
 from auth_app.models import User
@@ -67,8 +68,6 @@ class AllTransactionsView(APIView):
         except Exception as e:
             return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-# 3. View to return details of a specific transaction
 @method_decorator(csrf_exempt, name='dispatch')
 class TransactionDetailView(APIView):
     authentication_classes = [TokenAuthentication]
@@ -124,6 +123,12 @@ class DepositView(APIView):
                     amount=amount,
                     status='Completed'
                 )
+
+            Notification.objects.create(
+                user=user,
+                title="Deposit Successful",
+                message=f"A deposit of {amount} has been successfully added to your wallet."
+            )
 
             return Response({
                 "message": "Deposit successful.",
@@ -182,6 +187,12 @@ class WithdrawalRequestView(APIView):
                     amount=amount,
                     status='Pending'
                 )
+
+            Notification.objects.create(
+                user=user,
+                title="Withdrawal Request Submitted",
+                message=f"A withdrawal request of {amount} has been submitted. Your request is pending approval."
+            )
 
             return Response({
                 "message": "Withdrawal request submitted successfully.",

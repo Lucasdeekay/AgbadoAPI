@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from auth_app.views import get_user_from_token
+from notification_app.models import Notification
 from provider_app.models import ServiceProvider
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -60,6 +61,12 @@ class CreateServiceProviderView(APIView):
             )
 
             service_provider.save()
+
+            Notification.objects.create(
+                user=user,
+                title="Service Provider Profile Created",
+                message="Your service provider profile has been created successfully.",
+            )
 
             return Response(
                 {"message": "Service provider profile created successfully."},
@@ -134,6 +141,12 @@ class EditServiceProviderView(APIView):
                 service_provider.closing_hour = closing_hour
 
             service_provider.save()
+
+            Notification.objects.create(
+                user=user,
+                title="Service Provider Profile Updated",
+                message="Your service provider profile has been updated successfully.",
+            )
 
             return Response(
                 {"message": "Service provider profile updated successfully."},

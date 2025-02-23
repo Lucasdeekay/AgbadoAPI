@@ -107,6 +107,12 @@ class UpdateUserProfileView(APIView):
 
             user.save()
 
+            Notification.objects.create(
+                user=user,
+                title="Profile Updated",
+                message="Your profile has been updated successfully."
+            )
+
             return Response(
                 {"message": "User profile updated successfully."},
                 status=status.HTTP_200_OK
@@ -169,6 +175,12 @@ class UpdateKYCView(APIView):
 
             kyc.save()
 
+            Notification.objects.create(
+                user=user,
+                title="KYC Updated",
+                message="Your KYC details have been updated and are pending review."
+            )
+
             return Response(
                 {"message": "KYC details updated successfully."},
                 status=status.HTTP_200_OK
@@ -207,5 +219,11 @@ class ChangePasswordView(APIView):
         # Set the new password
         user.set_password(new_password)
         user.save()
+
+        Notification.objects.create(
+            user=user,
+            title="Password Changed",
+            message="Your password has been successfully changed."
+        )
 
         return Response({"message": "Password has been successfully changed."}, status=status.HTTP_200_OK)
