@@ -85,59 +85,154 @@ class ServiceDetailsView(APIView):
 class AddServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 
-    # permission_classes = [IsAuthenticated]
-
     def post(self, request):
-        serializer = ServiceSerializer(data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "Service added successfully.", "service": serializer.data},
-                            status=status.HTTP_201_CREATED)
-        return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            # Get the service provider profile
+            user = get_user_from_token(request)
+        
+            service_provider = ServiceProvider.objects.get(user=user)
+
+            name = request.data.get('name')
+            description = request.data.get('description')
+            category = request.data.get('category')
+            min_price = request.data.get('min_price')
+            max_price = request.data.get('max_price')
+            is_active = request.data.get('is_active', True) # Default to True if not provided
+            image = request.FILES.get('image') # Handle image upload
+
+            service = Service.objects.create(
+                provider=service_provider,
+                name=name,
+                description=description,
+                category=category,
+                min_price=min_price,
+                max_price=max_price,
+                is_active=is_active,
+                image=image, # Save the uploaded image
+            )
+
+            service_data = {
+                'name': service.name,
+                'description': service.description,
+                'category': service.category,
+                'min_price': str(service.min_price),
+                'max_price': str(service.max_price),
+                'is_active': service.is_active,
+                'image': service.image.url if service.image else None,
+                'created_at': service.created_at.isoformat(),
+            }
+
+            return Response({"message": "Service added successfully.", "service": service_data}, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AddSubServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 
-    # permission_classes = [IsAuthenticated]
+    def post(self, request, service_id):
+        try:
+            service = get_object_or_404(Service, id=service_id)
 
-    def post(self, request):
-        serializer = SubServiceSerializer(data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "Subservice added successfully.", "subservice": serializer.data},
-                            status=status.HTTP_201_CREATED)
-        return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            name = request.data.get('name')
+            description = request.data.get('description')
+            price = request.data.get('price')
+            is_active = request.data.get('is_active', True)
+            image = request.FILES.get('image')
+
+            service = get_object_or_404(Service, id=service_id)
+            subservice = SubService.objects.create(
+                service=service,
+                name=name,
+                description=description,
+                price=price,
+                is_active=is_active,
+                image=image,
+            )
+
+            subservice_data = {
+                'name': subservice.name,
+                'description': subservice.description,
+                'price': str(subservice.price),
+                'is_active': subservice.is_active,
+                'image': subservice.image.url if subservice.image else None,
+                'created_at': subservice.created_at.isoformat(),
+            }
+
+            return Response({"message": "Subservice added successfully.", "subservice": subservice_data}, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class EditServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 
-    # permission_classes = [IsAuthenticated]
-
     def post(self, request, service_id):
-        service = get_object_or_404(Service, id=service_id)
-        serializer = ServiceSerializer(service, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "Service updated successfully.", "service": serializer.data},
-                            status=status.HTTP_200_OK)
-        return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            service = get_object_or_404(Service, id=service_id)
+
+            service.name = request.data.get('name', service.name)
+            service.description = request.data.get('description', service.description)
+            service.category = request.data.get('category', service.category)
+            service.min_price = request.data.get('min_price', service.min_price)
+            service.max_price = request.data.get('max_price', service.max_price)
+            service.is_active = request.data.get('is_active', service.is_active)
+            if 'image' in request.FILES:
+                service.image = request.FILES['image']
+            service.save()
+
+            service_data = {
+                'id': service.id,
+                'provider': service.provider.id,
+                'name': service.name,
+                'description': service.description,
+                'category': service.category,
+                'min_price': str(service.min_price),
+                'max_price': str(service.max_price),
+                'is_active': service.is_active,
+                'image': service.image.url if service.image else None,
+                'created_at': service.created_at.isoformat(),
+            }
+
+            return Response({"message": "Service updated successfully.", "service": service_data}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class EditSubServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 
-    # permission_classes = [IsAuthenticated]
-
     def post(self, request, subservice_id):
-        subservice = get_object_or_404(SubService, id=subservice_id)
-        serializer = SubServiceSerializer(subservice, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "Subservice updated successfully.", "subservice": serializer.data},
-                            status=status.HTTP_200_OK)
-        return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            subservice = get_object_or_404(SubService, id=subservice_id)
+
+            subservice.service = get_object_or_404(Service, id=request.data.get('service'))
+            subservice.name = request.data.get('name', subservice.name)
+            subservice.description = request.data.get('description', subservice.description)
+            subservice.price = request.data.get('price', subservice.price)
+            subservice.is_active = request.data.get('is_active', subservice.is_active)
+            if 'image' in request.FILES:
+                subservice.image = request.FILES['image']
+            subservice.save()
+
+            subservice_data = {
+                'id': subservice.id,
+                'service': subservice.service.id,
+                'name': subservice.name,
+                'description': subservice.description,
+                'price': str(subservice.price),
+                'is_active': subservice.is_active,
+                'image': subservice.image.url if subservice.image else None,
+                'created_at': subservice.created_at.isoformat(),
+            }
+
+            return Response({"message": "Subservice updated successfully.", "subservice": subservice_data}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ServiceProviderBookingsView(APIView):

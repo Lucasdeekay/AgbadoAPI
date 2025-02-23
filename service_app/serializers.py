@@ -6,14 +6,14 @@ from .models import Service, SubService, ServiceRequest, ServiceRequestBid, Book
 class ServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
-        fields = ('id', 'name', 'description', 'category', 'min_price', 'max_price', 'is_active')
+        fields = '__all__'
 
 
 # Serializer for SubService model
 class SubServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubService
-        fields = ('id', 'service', 'name', 'description', 'price', 'is_active', 'created_at')
+        fields = '__all__'
 
 
 # Serializer for ServiceRequest model

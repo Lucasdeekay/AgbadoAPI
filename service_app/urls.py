@@ -23,7 +23,7 @@ urlpatterns = [
     path('all/', GetAllServicesDetailsView.as_view(), name='get_all_services'),
     path('<int:service_id>/', ServiceDetailsView.as_view(), name='service_details'),
     path('add/', AddServiceView.as_view(), name='add_service'),
-    path('sub-service/add/', AddSubServiceView.as_view(), name='add_subservice'),
+    path('sub-service/add/<int:service_id>/', AddSubServiceView.as_view(), name='add_subservice'),
     path('edit/<int:service_id>/', EditServiceView.as_view(), name='edit_service'),
     path('sub-service/edit/<int:subservice_id>/', EditSubServiceView.as_view(), name='edit_subservice'),
     path('api/', include(router.urls)),  # All routes are prefixed with 'api/'

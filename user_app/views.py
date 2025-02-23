@@ -30,6 +30,7 @@ class DashboardView(APIView):
                 "first_name": user.first_name,
                 "last_name": user.last_name,
                 "phone_number": user.phone_number,
+                "state": user.state,
                 "is_verified": user.is_verified,
                 "profile_picture": (
                     request.build_absolute_uri(user.profile_picture.url)
@@ -87,8 +88,6 @@ class UpdateUserProfileView(APIView):
         phone_number = request.data.get('phone_number')
         state = request.data.get('state')
         profile_picture = request.FILES.get('profile_picture')
-
-        write_to_file('file.txt', f'{phone_number}, {state}, {profile_picture}')
 
         # Handle empty requests gracefully
         if not phone_number and not state and not profile_picture:
