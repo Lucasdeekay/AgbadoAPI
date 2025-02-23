@@ -14,64 +14,99 @@ from provider_app.serializers import ServiceProviderSerializer
 from service_app.models import ServiceRequest, ServiceRequestBid, SubService, Service, Booking
 from service_app.serializers import BookingSerializer, ServiceRequestBidSerializer, ServiceSerializer, SubServiceSerializer
 
+
 @method_decorator(csrf_exempt, name='dispatch')
 class GetAllServicesDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
 
-    # permission_classes = [IsAuthenticated]
-
     def get(self, request):
-        # Get the service provider profile
         try:
             user = get_user_from_token(request)
             service_provider = user.provider_profile
+
+            provider_data = {
+                "user": service_provider.user.id,
+                "company_name": service_provider.company_name,
+                "company_address": service_provider.company_address,
+                "company_description": service_provider.company_description,
+                "company_phone_no": service_provider.company_phone_no,
+                "company_email": service_provider.company_email,
+                "business_category": service_provider.business_category,
+                "company_logo": request.build_absolute_uri(service_provider.company_logo.url) if service_provider.company_logo else None,
+                "opening_hour": service_provider.opening_hour,
+                "closing_hour": service_provider.closing_hour,
+                "avg_rating": service_provider.avg_rating,
+                "rating_population": service_provider.rating_population,
+                "is_approved": service_provider.is_approved,
+                "created_at": service_provider.created_at,
+            }
+
+            services = Service.objects.filter(provider=service_provider)
+            services_data = [{
+                "id": service.id,
+                "provider": service.provider.id,
+                "name": service.name,
+                "description": service.description,
+                "image": request.build_absolute_uri(service.image.url) if service.image else None,
+                "category": service.category,
+                "min_price": service.min_price,
+                "max_price": service.max_price,
+                "is_active": service.is_active,
+                "created_at": service.created_at,
+            } for service in services]
+
+            bookings = Booking.objects.filter(service_provider=service_provider.user).exclude(feedback=None)
+            reviews_data = [{
+                "user__email": booking.user.email,
+                "feedback": booking.feedback,
+                "rating": booking.rating,
+                "created_at": booking.created_at,
+            } for booking in bookings]
+
+            return Response({
+                "provider_details": provider_data,
+                "services": services_data,
+                "reviews": reviews_data
+            }, status=status.HTTP_200_OK)
+
         except ServiceProvider.DoesNotExist:
-            return Response(
-                {"message": "No service provider profile found."},
-                status=status.HTTP_200_OK,  # Return success with an empty response
-            )
-        
-            
-        # Fetch service provider details
-        service_provider = ServiceProvider.objects.get(user=user)
-        provider_data = ServiceProviderSerializer(service_provider).data
+            return Response({"message": "No service provider profile found."}, status=status.HTTP_200_OK)
 
-        # Fetch services provided by the service provider
-        services = Service.objects.filter(provider=service_provider)
-        services_data = ServiceSerializer(services, many=True).data
+        except Exception as e:
+            return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Fetch reviews from the Booking model
-        bookings = Booking.objects.filter(service_provider=service_provider.user).exclude(feedback=None)
-        reviews_data = bookings.values(
-            'user__email',  # Reviewer email
-            'feedback',  # Review text
-            'rating',  # Review rating
-            'created_at'  # Date of review
-        )
-
-        return Response({
-            "provider_details": provider_data,
-            "services": services_data,
-            "reviews": reviews_data
-        }, status=status.HTTP_200_OK)
-
-        
 @method_decorator(csrf_exempt, name='dispatch')
 class ServiceDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
 
-    # permission_classes = [IsAuthenticated]
-
     def get(self, request, service_id):
         try:
-
-            # Fetch service details
             service = get_object_or_404(Service, id=service_id)
-            service_data = ServiceSerializer(service).data
 
-            # Fetch subservices for the service
+            service_data = {
+                "id": service.id,
+                "provider": service.provider.id,
+                "name": service.name,
+                "description": service.description,
+                "image": request.build_absolute_uri(service.image.url) if service.image else None,
+                "category": service.category,
+                "min_price": service.min_price,
+                "max_price": service.max_price,
+                "is_active": service.is_active,
+                "created_at": service.created_at,
+            }
+
             subservices = SubService.objects.filter(service=service)
-            subservices_data = SubServiceSerializer(subservices, many=True).data
+            subservices_data = [{
+                "id": subservice.id,
+                "service": subservice.service.id,
+                "name": subservice.name,
+                "description": subservice.description,
+                "price": subservice.price,
+                "image": request.build_absolute_uri(subservice.image.url) if subservice.image else None,
+                "is_active": subservice.is_active,
+                "created_at": subservice.created_at,
+            } for subservice in subservices]
 
             return Response({
                 "service_details": service_data,
@@ -80,7 +115,7 @@ class ServiceDetailsView(APIView):
 
         except Exception as e:
             return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        
 @method_decorator(csrf_exempt, name='dispatch')
 class AddServiceView(APIView):
     authentication_classes = [TokenAuthentication]

@@ -176,7 +176,7 @@ class GetServiceProviderDetailsView(APIView):
             "company_phone_no": service_provider.company_phone_no,
             "company_email": service_provider.company_email,
             "business_category": service_provider.business_category,
-            "company_logo": service_provider.company_logo.url if service_provider.company_logo else None,
+            "company_logo": request.build_absolute_uri(service_provider.company_logo.url) if service_provider.company_logo else None,
             "opening_hour": service_provider.opening_hour,
             "closing_hour": service_provider.closing_hour,
             "is_approved": service_provider.is_approved,
