@@ -1,5 +1,7 @@
 from decimal import Decimal
+import os
 
+import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -16,6 +18,7 @@ from wallet_app.models import Wallet, Transaction, Withdrawal
 from wallet_app.serializers import TransactionSerializer, WithdrawalSerializer
 from auth_app.models import User
 
+PAYSTACK_SECRET_KEY = os.environ.get("PAYSTACK_SECRET_KEY") #Get paystack secret key from env variables.
 
 # 1. View to return wallet details and last 5 transactions
 @method_decorator(csrf_exempt, name='dispatch')
@@ -101,44 +104,58 @@ class DepositView(APIView):
 
             amount = request.data.get('amount')
             transaction_id = request.data.get('transaction_id')
-            if not amount:
-                return Response({"error": "Amount is required."}, status=status.HTTP_400_BAD_REQUEST)
+            paystack_ref = request.data.get('paystack_ref') #Get paystack ref.
+
+            if not amount or not paystack_ref:
+                return Response({"error": "Amount and paystack_ref are required."}, status=status.HTTP_400_BAD_REQUEST)
 
             amount = Decimal(amount)
             if amount <= 0:
                 return Response({"error": "Amount must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Get or create the user's wallet
-            wallet, created = Wallet.objects.get_or_create(user=user)
+            # Verify Paystack transaction
+            headers = {
+                'Authorization': f'Bearer {PAYSTACK_SECRET_KEY}',
+                'Content-Type': 'application/json'
+            }
+            paystack_response = requests.get(f'https://api.paystack.co/transaction/verify/{paystack_ref}', headers=headers)
+            paystack_response.raise_for_status()
+            paystack_data = paystack_response.json()
 
-            # Save the transaction as a deposit
-            with db_transaction.atomic():
-                wallet.balance += amount
-                wallet.save()
+            if paystack_data['data']['status'] == 'success':
+                # Payment is verified, update wallet
+                with db_transaction.atomic():
+                    wallet, created = Wallet.objects.get_or_create(user=user)
+                    wallet.balance += amount
+                    wallet.save()
 
-                transaction = Transaction.objects.create(
+                    transaction = Transaction.objects.create(
+                        user=user,
+                        transaction_type='Deposit',
+                        transaction_id=transaction_id,
+                        amount=amount,
+                        status='Completed'
+                    )
+
+                Notification.objects.create(
                     user=user,
-                    transaction_type='Deposit',
-                    transaction_id=transaction_id,
-                    amount=amount,
-                    status='Completed'
+                    title="Deposit Successful",
+                    message=f"A deposit of {amount} has been successfully added to your wallet."
                 )
 
-            Notification.objects.create(
-                user=user,
-                title="Deposit Successful",
-                message=f"A deposit of {amount} has been successfully added to your wallet."
-            )
+                return Response({
+                    "message": "Deposit successful.",
+                    "wallet_balance": wallet.balance,
+                    "transaction": TransactionSerializer(transaction).data
+                }, status=status.HTTP_201_CREATED)
+            else:
+                return Response({"error": "Paystack verification failed."}, status=status.HTTP_400_BAD_REQUEST)
 
-            return Response({
-                "message": "Deposit successful.",
-                "wallet_balance": wallet.balance,
-                "transaction": TransactionSerializer(transaction).data
-            }, status=status.HTTP_201_CREATED)
-
+        except requests.exceptions.RequestException as e:
+            return Response({"error": f"Paystack verification error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
             return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        
 @method_decorator(csrf_exempt, name='dispatch')
 class WithdrawalRequestView(APIView):
     authentication_classes = [TokenAuthentication]
