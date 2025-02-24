@@ -1,6 +1,7 @@
 from django.shortcuts import redirect
 import jwt
 from rest_framework import status, permissions
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
