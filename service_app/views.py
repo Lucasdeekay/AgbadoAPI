@@ -332,7 +332,7 @@ class ServiceProviderBidsView(APIView):
 
         # Get bids made by this service provider, excluding bids from the current user.
         bids = ServiceRequestBid.objects.filter(service_provider=user).exclude(service_request__bids__service_provider=user)
-        
+
         bid_serializer = ServiceRequestBidSerializer(bids, many=True, context={'request': request})
 
         return Response({
@@ -352,23 +352,47 @@ class SubmitBidView(APIView):
             service_request = ServiceRequest.objects.get(id=service_request_id)
         except ServiceRequest.DoesNotExist:
             raise NotFound("Service request not found")
-        
-        data = request.data.copy()
-        data['service_request'] = service_request.id
-        data['service_provider'] = service_provider.id
-        
-        serializer = ServiceRequestBidSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
+
+        price = request.data.get('price')
+
+        if price is None:
+            return Response({"error": "Price is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            price = float(price)  # Convert price to float
+        except ValueError:
+            return Response({"error": "Invalid price format"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if a bid already exists
+        existing_bid = ServiceRequestBid.objects.filter(service_request=service_request, service_provider=service_provider).first()
+
+        if existing_bid:
+            # Update existing bid
+            existing_bid.price = price
+            existing_bid.save()
 
             Notification.objects.create(
-            user=service_provider,
-            title="Bid Submitted",
-            message=f"You have submitted a bid for service request: {service_request.title}"
-        )
-            
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                user=service_provider,
+                title="Bid Updated",
+                message=f"You have updated your bid for service request: {service_request.title}"
+            )
+
+            return Response({"message": "Bid updated successfully"}, status=status.HTTP_200_OK)
+        else:
+            # Create new bid
+            ServiceRequestBid.objects.create(
+                service_request=service_request,
+                service_provider=service_provider,
+                price=price
+            )
+
+            Notification.objects.create(
+                user=service_provider,
+                title="Bid Submitted",
+                message=f"You have submitted a bid for service request: {service_request.title}"
+            )
+
+            return Response({"message": "Bid submitted successfully"}, status=status.HTTP_201_CREATED)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class CancelBookingView(APIView):
