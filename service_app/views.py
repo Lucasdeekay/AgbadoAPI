@@ -13,7 +13,7 @@ from notification_app.models import Notification
 from provider_app.models import ServiceProvider
 from provider_app.serializers import ServiceProviderSerializer
 from service_app.models import ServiceRequest, ServiceRequestBid, SubService, Service, Booking
-from service_app.serializers import BookingSerializer, ServiceRequestBidSerializer, ServiceSerializer, SubServiceSerializer
+from service_app.serializers import BookingSerializer, ServiceRequestBidSerializer, ServiceRequestSerializer, ServiceSerializer, SubServiceSerializer
 
 
 @method_decorator(csrf_exempt, name='dispatch')
