@@ -63,6 +63,7 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
 # Serializer for ServiceRequestBid model
 class ServiceRequestBidSerializer(serializers.ModelSerializer):
     service_provider = serializers.SerializerMethodField()
+    service_request = serializers.SerializerMethodField() # Added service_request field
 
     class Meta:
         model = ServiceRequestBid
@@ -78,6 +79,22 @@ class ServiceRequestBidSerializer(serializers.ModelSerializer):
             "profile_picture": request.build_absolute_uri(obj.service_provider.profile_picture.url) if obj.service_provider.profile_picture and obj.service_provider.profile_picture.url else None,
         }
         return user_data
+
+    def get_service_request(self, obj): # method to get service request details.
+        request = self.context.get('request')
+        service_request_data = {
+            "id": obj.service_request.id,
+            "user": obj.service_request.user.id, # or serialize the user details similarly
+            "title": obj.service_request.title,
+            "description": obj.service_request.description,
+            "image": request.build_absolute_uri(obj.service_request.image.url) if obj.service_request.image and obj.service_request.image.url else None,
+            "price": str(obj.service_request.price), # Decimal to String
+            "category": obj.service_request.category,
+            "status": obj.service_request.status,
+            "created_at": obj.service_request.created_at,
+            "updated_at": obj.service_request.updated_at,
+        }
+        return service_request_data
 
 # Serializer for Booking model
 class BookingSerializer(serializers.ModelSerializer):
