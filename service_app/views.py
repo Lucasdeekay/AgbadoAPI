@@ -319,10 +319,25 @@ class ServiceProviderBidsView(APIView):
     # permission_classes = [IsAuthenticated]
     
     def get(self, request, *args, **kwargs):
-        service_provider = get_user_from_token(request)  # Assuming the authenticated user is a service provider
-        bids = ServiceRequestBid.objects.filter(service_provider=service_provider)
-        serializer = ServiceRequestBidSerializer(bids, many=True)
-        return Response({'requests': serializer.data})
+        user = get_user_from_token(request)
+
+        try:
+            service_provider = ServiceProvider.objects.get(user=user)
+        except ServiceProvider.DoesNotExist:
+            return Response({"error": "Service provider profile not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Get service requests in the same category as the service provider
+        service_requests = ServiceRequest.objects.filter(category=service_provider.business_category)
+        request_serializer = ServiceRequestSerializer(service_requests, many=True, context={'request': request})
+
+        # Get bids made by this service provider
+        bids = ServiceRequestBid.objects.filter(service_provider=user)
+        bid_serializer = ServiceRequestBidSerializer(bids, many=True, context={'request': request})
+
+        return Response({
+            'requests': request_serializer.data,
+            'bids': bid_serializer.data,
+        })
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SubmitBidView(APIView):

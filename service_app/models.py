@@ -3,13 +3,29 @@ from django.db import models
 from auth_app.models import User
 from provider_app.models import ServiceProvider
 
+CATEGORIES = [
+    ('Electrical', 'Electrical'),
+    ('Automobile', 'Automobile'),
+    ('Carpentry', 'Carpentry'),
+    ('Cleaning', 'Cleaning'),
+    ('Plumbing', 'Plumbing'),
+    ('Fumigation', 'Fumigation'),
+    ('Legal', 'Legal'),
+    ('Healthcare', 'Healthcare'),
+    ('Fashion', 'Fashion'),
+    ('Shopping', 'Shopping'),
+    ('Construction', 'Construction'),
+    ('Fitness', 'Fitness'),
+    ('Engineering', 'Engineering'),
+    ('Education', 'Education'),
+]
 
 class Service(models.Model):
     provider = models.ForeignKey(ServiceProvider, on_delete=models.CASCADE, related_name="services")
     name = models.CharField(max_length=255)
     description = models.TextField()
     image = models.ImageField(upload_to='service_images/', null=True, blank=True)
-    category = models.CharField(max_length=100)
+    category = models.CharField(max_length=100, choices=CATEGORIES)  # Updated to use choices
     min_price = models.DecimalField(max_digits=16, decimal_places=2)
     max_price = models.DecimalField(max_digits=16, decimal_places=2)
     is_active = models.BooleanField(default=True)
@@ -44,7 +60,7 @@ class ServiceRequest(models.Model):
     description = models.TextField()
     image = models.ImageField(upload_to="service_requests/", null=True, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    category = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="service_requests")
+    category = models.CharField(max_length=100, choices=CATEGORIES)  # Updated to use choices
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

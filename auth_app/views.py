@@ -54,7 +54,7 @@ def delete_token(request):
         raise AuthenticationFailed('Invalid Authorization header format')
 
 @method_decorator(csrf_exempt, name='dispatch')
-class RegisterView(APIView):
+class RegisterServiceProviderView(APIView):
     def post(self, request):
         """
         Register a new user. Either email or phone number is required.
@@ -95,7 +95,7 @@ class RegisterView(APIView):
         if serializer.is_valid():
             user = serializer.save()
             user.set_password(password)
-            user.save()
+            user.is_service_provider = True
 
             # user.is_active = False  # Deactivate account until verification
             user.save()
