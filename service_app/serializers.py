@@ -36,6 +36,7 @@ class SubServiceSerializer(serializers.ModelSerializer):
 # Serializer for ServiceRequest model
 class ServiceRequestSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()  # Include user details
 
     class Meta:
         model = ServiceRequest
@@ -46,6 +47,17 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
         if obj.image and obj.image.url:
             return request.build_absolute_uri(obj.image.url)
         return None
+    
+    def get_user(self, obj):
+        request = self.context.get('request')
+        user_data = {
+            "id": obj.user.id,
+            "email": obj.user.email,
+            "first_name": obj.user.first_name,
+            "last_name": obj.user.last_name,
+            "profile_picture": request.build_absolute_uri(obj.user.profile_picture.url) if obj.user.profile_picture and obj.user.profile_picture.url else None,
+        }
+        return user_data
 
 
 # Serializer for ServiceRequestBid model
