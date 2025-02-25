@@ -327,11 +327,11 @@ class ServiceProviderBidsView(APIView):
             return Response({"error": "Service provider profile not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Get service requests in the same category as the service provider
-        service_requests = ServiceRequest.objects.filter(category=service_provider.business_category)
+        service_requests = ServiceRequest.objects.filter(category=service_provider.business_category).exclude(user=user)
         request_serializer = ServiceRequestSerializer(service_requests, many=True, context={'request': request})
 
         # Get bids made by this service provider, excluding bids from the current user.
-        bids = ServiceRequestBid.objects.filter(service_provider=user).exclude(service_request__bids__service_provider=user)
+        bids = ServiceRequestBid.objects.filter(service_provider=user)
 
         bid_serializer = ServiceRequestBidSerializer(bids, many=True, context={'request': request})
 
