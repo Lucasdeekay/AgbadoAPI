@@ -330,8 +330,9 @@ class ServiceProviderBidsView(APIView):
         service_requests = ServiceRequest.objects.filter(category=service_provider.business_category)
         request_serializer = ServiceRequestSerializer(service_requests, many=True, context={'request': request})
 
-        # Get bids made by this service provider
-        bids = ServiceRequestBid.objects.filter(service_provider=user)
+        # Get bids made by this service provider, excluding bids from the current user.
+        bids = ServiceRequestBid.objects.filter(service_provider=user).exclude(service_request__bids__service_provider=user)
+
         bid_serializer = ServiceRequestBidSerializer(bids, many=True, context={'request': request})
 
         return Response({
