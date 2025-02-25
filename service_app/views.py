@@ -349,7 +349,7 @@ class SubmitBidView(APIView):
     def post(self, request, service_request_id, *args, **kwargs):
         service_provider = get_user_from_token(request)
         try:
-            service_request = ServiceRequest.objects.get(id=service_request_id)
+            service_request = ServiceRequest.objects.get(id=int(service_request_id))
         except ServiceRequest.DoesNotExist:
             raise NotFound("Service request not found")
 
@@ -403,7 +403,7 @@ class CancelBookingView(APIView):
     def post(self, request, booking_id, *args, **kwargs):
         service_provider = get_user_from_token(request)
         try:
-            booking = Booking.objects.get(id=booking_id, service_provider=service_provider)
+            booking = Booking.objects.get(id=int(booking_id), service_provider=service_provider)
         except Booking.DoesNotExist:
             raise NotFound("Booking not found")
         
@@ -427,7 +427,7 @@ class CompleteBookingView(APIView):
     def post(self, request, booking_id, *args, **kwargs):
         service_provider = get_user_from_token(request)
         try:
-            booking = Booking.objects.get(id=booking_id, service_provider=service_provider)
+            booking = Booking.objects.get(id=int(booking_id), service_provider=service_provider)
         except Booking.DoesNotExist:
             raise NotFound("Booking not found")
         
