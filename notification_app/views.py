@@ -42,12 +42,12 @@ class GetUserNotificationsView(APIView):
 
         except DatabaseError:
             return Response({
-                'error': 'A database error occurred while fetching notifications.'
+                "message": 'A database error occurred while fetching notifications.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         except Exception as e:
             return Response({
-                'error': f'An unexpected error occurred: {str(e)}'
+                "message": f'An unexpected error occurred: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -76,10 +76,10 @@ class UpdateAllNotificationsReadStatusView(APIView):
 
         except DatabaseError:
             return Response({
-                'error': 'A database error occurred while updating notifications.'
+                "message": 'A database error occurred while updating notifications.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         except Exception as e:
             return Response({
-                'error': f'An unexpected error occurred: {str(e)}'
+                "message": f'An unexpected error occurred: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

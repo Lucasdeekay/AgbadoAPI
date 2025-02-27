@@ -74,7 +74,7 @@ class GetAllServicesDetailsView(APIView):
             return Response({"message": "No service provider profile found."}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ServiceDetailsView(APIView):
@@ -115,7 +115,7 @@ class ServiceDetailsView(APIView):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 @method_decorator(csrf_exempt, name='dispatch')
 class AddServiceView(APIView):
@@ -167,7 +167,7 @@ class AddServiceView(APIView):
             return Response({"message": "Service added successfully.", "service": service_data}, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AddSubServiceView(APIView):
@@ -213,7 +213,7 @@ class AddSubServiceView(APIView):
             return Response({"message": "Subservice added successfully.", "subservice": subservice_data}, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class EditServiceView(APIView):
@@ -257,7 +257,7 @@ class EditServiceView(APIView):
             return Response({"message": "Service updated successfully.", "service": service_data}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class EditSubServiceView(APIView):
@@ -298,7 +298,7 @@ class EditSubServiceView(APIView):
             return Response({"message": "Subservice updated successfully.", "subservice": subservice_data}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ServiceProviderBookingsView(APIView):
@@ -324,7 +324,7 @@ class ServiceProviderBidsView(APIView):
         try:
             service_provider = ServiceProvider.objects.get(user=user)
         except ServiceProvider.DoesNotExist:
-            return Response({"error": "Service provider profile not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "Service provider profile not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Get service requests in the same category as the service provider
         service_requests = ServiceRequest.objects.filter(category=service_provider.business_category).exclude(user=user)
@@ -356,12 +356,12 @@ class SubmitBidView(APIView):
         price = request.data.get('price')
 
         if price is None:
-            return Response({"error": "Price is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Price is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             price = float(price)  # Convert price to float
         except ValueError:
-            return Response({"error": "Invalid price format"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Invalid price format"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Check if a bid already exists
         existing_bid = ServiceRequestBid.objects.filter(service_request=service_request, service_provider=service_provider).first()

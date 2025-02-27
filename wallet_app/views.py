@@ -47,9 +47,9 @@ class WalletDetailsView(APIView):
             }, status=status.HTTP_200_OK)
 
         except Wallet.DoesNotExist:
-            return Response({"error": "Wallet not found for this user."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "Wallet not found for this user."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # 2. View to return all transactions for the user
@@ -69,7 +69,7 @@ class AllTransactionsView(APIView):
             return Response({"transactions": transactions_data}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class TransactionDetailView(APIView):
@@ -87,11 +87,11 @@ class TransactionDetailView(APIView):
             return Response({"transaction": transaction_data}, status=status.HTTP_200_OK)
 
         except Transaction.DoesNotExist:
-            return Response({"error": "Transaction not found or does not belong to this user."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "Transaction not found or does not belong to this user."}, status=status.HTTP_404_NOT_FOUND)
         except ValueError:
-            return Response({"error": "Invalid transaction ID."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Invalid transaction ID."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class DepositView(APIView):
@@ -107,11 +107,11 @@ class DepositView(APIView):
             paystack_ref = request.data.get('paystack_ref') #Get paystack ref.
 
             if not amount or not paystack_ref:
-                return Response({"error": "Amount and paystack_ref are required."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "Amount and paystack_ref are required."}, status=status.HTTP_400_BAD_REQUEST)
 
             amount = Decimal(amount)
             if amount <= 0:
-                return Response({"error": "Amount must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "Amount must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Verify Paystack transaction
             headers = {
@@ -149,12 +149,12 @@ class DepositView(APIView):
                     "transaction": TransactionSerializer(transaction).data
                 }, status=status.HTTP_201_CREATED)
             else:
-                return Response({"error": "Paystack verification failed."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "Paystack verification failed."}, status=status.HTTP_400_BAD_REQUEST)
 
         except requests.exceptions.RequestException as e:
-            return Response({"error": f"Paystack verification error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"Paystack verification error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 @method_decorator(csrf_exempt, name='dispatch')
 class WithdrawalRequestView(APIView):
@@ -172,16 +172,16 @@ class WithdrawalRequestView(APIView):
 
             # Input validation
             if not bank_name or not account_number or not amount:
-                return Response({"error": "Bank name, account number, and amount are required."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "Bank name, account number, and amount are required."}, status=status.HTTP_400_BAD_REQUEST)
 
             amount = Decimal(amount)
             if amount <= 0:
-                return Response({"error": "Amount must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "Amount must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Get user's wallet and check balance
             wallet = Wallet.objects.get(user=user)
             if wallet.balance < amount:
-                return Response({"error": "Insufficient balance for withdrawal."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "Insufficient balance for withdrawal."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Save the withdrawal request
             with db_transaction.atomic():
@@ -219,6 +219,6 @@ class WithdrawalRequestView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         except Wallet.DoesNotExist:
-            return Response({"error": "Wallet not found for this user."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "Wallet not found for this user."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

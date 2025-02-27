@@ -23,7 +23,7 @@ class CreateServiceProviderView(APIView):
         # Check if the user already has a provider profile
         if hasattr(user, "provider_profile"):
             return Response(
-                {"error": "User already has a provider profile."},
+                {"message": "User already has a provider profile."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -41,7 +41,7 @@ class CreateServiceProviderView(APIView):
         # Validate required fields
         if not company_name or not company_address or not business_category:
             return Response(
-                {"error": "All required fields must be provided."},
+                {"message": "All required fields must be provided."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -75,12 +75,12 @@ class CreateServiceProviderView(APIView):
 
         except IntegrityError:
             return Response(
-                {"error": "A service provider with this contact information already exists."},
+                {"message": "A service provider with this contact information already exists."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
             return Response(
-                {"error": f"An error occurred: {str(e)}"},
+                {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -97,7 +97,7 @@ class EditServiceProviderView(APIView):
             service_provider = user.provider_profile
         except ServiceProvider.DoesNotExist:
             return Response(
-                {"error": "Service provider profile not found."},
+                {"message": "Service provider profile not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -115,7 +115,7 @@ class EditServiceProviderView(APIView):
         # Handle empty requests gracefully
         if not any([company_name, company_address, company_description, company_phone_no, company_email, business_category, company_logo, opening_hour, closing_hour]):
             return Response(
-                {"error": "No data provided to update."},
+                {"message": "No data provided to update."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -155,12 +155,12 @@ class EditServiceProviderView(APIView):
 
         except IntegrityError:
             return Response(
-                {"error": "A service provider with this contact information already exists."},
+                {"message": "A service provider with this contact information already exists."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
             return Response(
-                {"error": f"An error occurred: {str(e)}"},
+                {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

@@ -39,7 +39,7 @@ class DashboardView(APIView):
                 ),
             }
         except Exception as e:
-            return Response({"error": f"Error fetching user details: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"Error fetching user details: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         try:
             # Fetch wallet details
@@ -49,9 +49,9 @@ class DashboardView(APIView):
                 "last_updated": wallet.updated_at,
             }
         except Wallet.DoesNotExist:
-            return Response({"error": "Wallet not found for this user."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "Wallet not found for this user."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"error": f"Error fetching wallet details: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"Error fetching wallet details: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         try:
             # Fetch last 5 transactions
@@ -92,7 +92,7 @@ class UpdateUserProfileView(APIView):
         # Handle empty requests gracefully
         if not phone_number and not state and not profile_picture:
             return Response(
-                {"error": "No data provided to update."},
+                {"message": "No data provided to update."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -120,12 +120,12 @@ class UpdateUserProfileView(APIView):
 
         except IntegrityError:
             return Response(
-                {"error": "Phone number must be unique."},
+                {"message": "Phone number must be unique."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
             return Response(
-                {"error": f"An error occurred: {str(e)}"},
+                {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -142,7 +142,7 @@ class UpdateKYCView(APIView):
             kyc = user.kyc
         except ObjectDoesNotExist:
             return Response(
-                {"error": "KYC record not found for this user."},
+                {"message": "KYC record not found for this user."},
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -155,7 +155,7 @@ class UpdateKYCView(APIView):
         # Handle empty requests gracefully
         if not any([national_id, bvn, driver_license, proof_of_address]):
             return Response(
-                {"error": "No data provided to update KYC."},
+                {"message": "No data provided to update KYC."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -188,7 +188,7 @@ class UpdateKYCView(APIView):
 
         except Exception as e:
             return Response(
-                {"error": f"An error occurred: {str(e)}"},
+                {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -208,12 +208,12 @@ class ChangePasswordView(APIView):
         new_password = request.data.get('new_password')
 
         if not current_password or not new_password:
-            return Response({"error": "Both current_password and new_password are required."},
+            return Response({"message": "Both current_password and new_password are required."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         # Validate the current password
         if not user.check_password(current_password):
-            return Response({"error": "The current password is incorrect."},
+            return Response({"message": "The current password is incorrect."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         # Set the new password

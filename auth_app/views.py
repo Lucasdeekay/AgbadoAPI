@@ -68,14 +68,14 @@ class RegisterServiceProviderView(APIView):
         referral_code = request.data.get('referral_code')
 
         if not email or not phone_number or not password:
-            return Response({"error": "Email, phone number, and password are required."},
+            return Response({"message": "Email, phone number, and password are required."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         if CustomUser.objects.filter(email=email).exists():
-            return Response({"error": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
         if CustomUser.objects.filter(phone_number=phone_number).exists():
-            return Response({"error": "A user with this phone number already exists."},
+            return Response({"message": "A user with this phone number already exists."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         if CustomUser.objects.filter(referral_code=referral_code).exists():
@@ -121,7 +121,7 @@ class SendOTPView(APIView):
         identifier = request.data.get('identifier')  # email or phone number
 
         if not identifier:
-            return Response({"error": "Identifier (email or phone) and OTP are required."},
+            return Response({"message": "Identifier (email or phone) and OTP are required."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -145,7 +145,7 @@ class SendOTPView(APIView):
                 # Send OTP to phone
                 send_otp_sms(user, otp)
         except CustomUser.DoesNotExist:
-            return Response({"error": "User with the provided email or phone number does not exist."},
+            return Response({"message": "User with the provided email or phone number does not exist."},
                             status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -161,7 +161,7 @@ class VerifyOTPView(APIView):
         otp = request.data.get('otp')
 
         if not identifier or not otp:
-            return Response({"error": "Identifier (email or phone) and OTP are required."},
+            return Response({"message": "Identifier (email or phone) and OTP are required."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -171,17 +171,17 @@ class VerifyOTPView(APIView):
             else:
                 user = CustomUser.objects.get(phone_number=identifier)
         except CustomUser.DoesNotExist:
-            return Response({"error": "User with the provided email or phone number does not exist."},
+            return Response({"message": "User with the provided email or phone number does not exist."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         # Check OTP validity
         existing_otp = OTP.objects.filter(user=user, otp=otp, is_used=False).last()
 
         if not existing_otp:
-            return Response({"error": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
 
         if existing_otp.is_expired():
-            return Response({"error": "OTP has expired."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "OTP has expired."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Mark user as verified
         user.is_verified = True
@@ -204,7 +204,7 @@ class LoginView(APIView):
         password = request.data.get('password')
 
         if not identifier or not password:
-            return Response({"error": "Identifier (email or phone) and password are required."},
+            return Response({"message": "Identifier (email or phone) and password are required."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         # Attempt authentication using email
@@ -233,7 +233,7 @@ class LoginView(APIView):
                 }
             })
         else:
-            return Response({"error": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class LogoutView(APIView):
@@ -262,7 +262,7 @@ class ForgotPasswordView(APIView):
         identifier = request.data.get('identifier')  # email or phone number
 
         if not identifier:
-            return Response({"error": "Email or Phone number is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Email or Phone number is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             # Check if identifier is email or phone number
@@ -271,13 +271,13 @@ class ForgotPasswordView(APIView):
             else:
                 user = CustomUser.objects.get(phone_number=identifier)
         except CustomUser.DoesNotExist:
-            return Response({"error": "User with the provided email or phone number does not exist."},
+            return Response({"message": "User with the provided email or phone number does not exist."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         # Check if there's an existing OTP and it’s still valid
         existing_otp = OTP.objects.filter(user=user, is_used=False).last()
         if existing_otp and not existing_otp.is_expired():
-            return Response({"error": "An OTP was already sent. Please check your email/phone."},
+            return Response({"message": "An OTP was already sent. Please check your email/phone."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         # Generate and save OTP
@@ -304,7 +304,7 @@ class ResetPasswordView(APIView):
         new_password = request.data.get('new_password')
 
         if not identifier or not new_password:
-            return Response({"error": "Identifier (email or phone), OTP, and new password are required."},
+            return Response({"message": "Identifier (email or phone), OTP, and new password are required."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -314,7 +314,7 @@ class ResetPasswordView(APIView):
             else:
                 user = CustomUser.objects.get(phone_number=identifier)
         except CustomUser.DoesNotExist:
-            return Response({"error": "User with the provided email or phone number does not exist."},
+            return Response({"message": "User with the provided email or phone number does not exist."},
                             status=status.HTTP_400_BAD_REQUEST)
 
         # Update password
