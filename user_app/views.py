@@ -4,6 +4,8 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
+from decouple import config
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -32,6 +34,7 @@ class DashboardView(APIView):
                 "phone_number": user.phone_number,
                 "state": user.state,
                 "is_verified": user.is_verified,
+                "paystack_key": config('PAYSTACK_SECRET_KEY'),
                 "profile_picture": (
                     request.build_absolute_uri(user.profile_picture.url)
                     if user.profile_picture and user.profile_picture.url
