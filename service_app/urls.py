@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from .views import CancelBookingView, CompleteBookingView, ServiceProviderBidsView, ServiceProviderBookingsView, GetAllServicesDetailsView, ServiceDetailsView, AddServiceView, AddSubServiceView, EditServiceView, \
+from .views import CancelBookingView, CompleteBookingView, GetSubServiceDetailsView, ServiceProviderBidsView, ServiceProviderBookingsView, GetAllServicesDetailsView, GetServiceDetailsView, AddServiceView, AddSubServiceView, EditServiceView, \
     EditSubServiceView, SubmitBidView
 from .viewsets import ServiceViewSet, SubServiceViewSet, ServiceRequestViewSet, ServiceRequestBidViewSet, BookingViewSet
 
@@ -21,7 +21,8 @@ urlpatterns = [
     path('bookings/cancel/<int:booking_id>/', CancelBookingView.as_view(), name='cancel-booking'),
     path('bookings/complete/<int:booking_id>/', CompleteBookingView.as_view(), name='complete-booking'),
     path('all/', GetAllServicesDetailsView.as_view(), name='get_all_services'),
-    path('<int:service_id>/', ServiceDetailsView.as_view(), name='service_details'),
+    path('<int:service_id>/', GetServiceDetailsView.as_view(), name='service_details'),
+    path('sub-service/<int:sub-service_id>/', GetSubServiceDetailsView.as_view(), name='sub_service_details'),
     path('add/', AddServiceView.as_view(), name='add_service'),
     path('sub-service/add/<int:service_id>/', AddSubServiceView.as_view(), name='add_subservice'),
     path('edit/<int:service_id>/', EditServiceView.as_view(), name='edit_service'),

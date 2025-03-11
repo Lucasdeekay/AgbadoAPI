@@ -77,7 +77,7 @@ class GetAllServicesDetailsView(APIView):
             return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @method_decorator(csrf_exempt, name='dispatch')
-class ServiceDetailsView(APIView):
+class GetServiceDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
 
     def get(self, request, service_id):
@@ -115,8 +115,33 @@ class ServiceDetailsView(APIView):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
+            return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)     
+
+@method_decorator(csrf_exempt, name='dispatch')
+class GetSubServiceDetailsView(APIView):
+    authentication_classes = [TokenAuthentication]
+
+    def get(self, request, sub_service_id):
+        try:
+            subservice = get_object_or_404(SubService, id=sub_service_id)
+            subservice_data = {
+                "id": subservice.id,
+                "service": subservice.service.id,
+                "name": subservice.name,
+                "description": subservice.description,
+                "price": subservice.price,
+                "image": request.build_absolute_uri(subservice.image.url) if subservice.image else None,
+                "is_active": subservice.is_active,
+                "created_at": subservice.created_at,
+            }
+
+            return Response({
+                "sub_service": subservice_data
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
             return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
 @method_decorator(csrf_exempt, name='dispatch')
 class AddServiceView(APIView):
     authentication_classes = [TokenAuthentication]
