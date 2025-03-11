@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 
+from auth_app.models import KYC
 from auth_app.utils import write_to_file
 from auth_app.views import get_user_from_token
 from notification_app.models import Notification
@@ -142,7 +143,7 @@ class UpdateKYCView(APIView):
 
         # Retrieve the user's KYC record
         try:
-            kyc = user.kyc
+            kyc = KYC.objects.get_or_create(user=user)
         except ObjectDoesNotExist:
             return Response(
                 {"message": "KYC record not found for this user."},
