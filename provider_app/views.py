@@ -97,7 +97,7 @@ class EditServiceProviderView(APIView):
             service_provider = user.provider_profile
         except ServiceProvider.DoesNotExist:
             return Response(
-                {"message": "Service provider profile not found."},
+                {"message": "User does not have a business profile, kindly create one."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 

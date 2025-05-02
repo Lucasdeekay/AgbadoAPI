@@ -18,6 +18,7 @@ CATEGORIES = [
     ('Fitness', 'Fitness'),
     ('Engineering', 'Engineering'),
     ('Education', 'Education'),
+    ('Others', 'Others'),
 ]
 
 class Service(models.Model):

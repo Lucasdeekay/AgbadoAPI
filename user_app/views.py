@@ -124,7 +124,7 @@ class UpdateUserProfileView(APIView):
 
         except IntegrityError:
             return Response(
-                {"message": "Phone number must be unique."},
+                {"message": "Phone number is already in use by another user."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:

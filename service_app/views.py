@@ -23,7 +23,7 @@ class GetAllServicesDetailsView(APIView):
     def get(self, request):
         try:
             user = get_user_from_token(request)
-            service_provider = user.provider_profile
+            service_provider = ServiceProvider.objects.get(user=user)
 
             provider_data = {
                 "user": service_provider.user.id,
@@ -71,7 +71,7 @@ class GetAllServicesDetailsView(APIView):
             }, status=status.HTTP_200_OK)
 
         except ServiceProvider.DoesNotExist:
-            return Response({"message": "No service provider profile found."}, status=status.HTTP_200_OK)
+            return Response({"message": "User does not have a business profile, kindly create one."}, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -349,7 +349,7 @@ class ServiceProviderBidsView(APIView):
         try:
             service_provider = ServiceProvider.objects.get(user=user)
         except ServiceProvider.DoesNotExist:
-            return Response({"message": "Service provider profile not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "User does not have a business profile, kindly create one."}, status=status.HTTP_404_NOT_FOUND)
 
         # Get service requests in the same category as the service provider
         service_requests = ServiceRequest.objects.filter(category=service_provider.business_category).exclude(user=user)
