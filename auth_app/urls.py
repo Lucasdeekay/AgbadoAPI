@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from .views import RegisterServiceProviderView, LoginView, LogoutView, ForgotPasswordView, RegisterUserView, ResetPasswordView, SendOTPView, VerifyOTPView, \
+from .views import RegisterServiceProviderView, LoginView, LogoutView, ForgotPasswordView, RegisterUserView, ResetPasswordView, SendOTPView, UpdateIsBusyView, VerifyOTPView, \
     GoogleAppleAuthView
 from .viewsets import UserViewSet, KYCViewSet, OTPViewSet, ReferralViewSet
 
@@ -20,6 +20,7 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
+    path('update-status/', UpdateIsBusyView.as_view(), name='update-status'),
     path('login/google-or-apple/', GoogleAppleAuthView.as_view(), name='google-or-apple-auth'),
     path('api/', include(router.urls)),  # All routes are prefixed with 'api/'
 ]

@@ -4,9 +4,9 @@ from .models import User, KYC, OTP, Referral
 
 # Registering the User model with custom admin interface
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('email', 'first_name', 'last_name', 'is_active', 'is_service_provider', 'date_joined')
+    list_display = ('email', 'first_name', 'last_name', 'is_active', 'is_service_provider', 'date_joined', 'is_busy')
     search_fields = ('email', 'first_name', 'last_name')
-    list_filter = ('is_active', 'is_service_provider')
+    list_filter = ('is_active', 'is_service_provider', 'is_busy')
     ordering = ('-date_joined',)
 
 

@@ -385,6 +385,33 @@ class ResetPasswordView(APIView):
         return Response({"message": "Password has been successfully reset."}, status=status.HTTP_200_OK)
 
 @method_decorator(csrf_exempt, name='dispatch')
+class UpdateIsBusyView(APIView):
+    authentication_classes = [TokenAuthentication]
+    # permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        """
+        Updates the is_busy field for the specified user.
+        """
+        user = get_user_from_token(request) # Replace with your actual user retrieval method.
+
+        try:
+
+            # Toggle the is_busy field
+            user.is_busy = not user.is_busy
+            user.save()
+
+            return Response({
+                'is_busy': user.is_busy,
+                'message': 'Successfully updated user status.'
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                "message": f'An unexpected error occurred: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@method_decorator(csrf_exempt, name='dispatch')
 class GoogleAppleAuthView(APIView):
     def post(self, request):
         data = request.data
@@ -419,3 +446,5 @@ class GoogleAppleAuthView(APIView):
         except CustomUser.DoesNotExist:
             # If user doesn't exist, register them
             return redirect('register')  # Redirect to the Register view (you can handle this in frontend)
+
+

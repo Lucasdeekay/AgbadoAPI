@@ -33,6 +33,7 @@ class User(AbstractUser):
     date_joined = models.DateTimeField(auto_now_add=True)
     profile_picture = models.ImageField(upload_to='profile_picture/', null=True, blank=True)
     referral_code = models.CharField(max_length=15, unique=True, null=True, blank=True)
+    is_busy = models.BooleanField(default=False)
 
     objects = UserManager()
 
