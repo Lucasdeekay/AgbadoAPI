@@ -389,7 +389,7 @@ class UpdateIsBusyView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
 
-    def patch(self, request):
+    def put(self, request):
         """
         Updates the is_busy field for the specified user.
         """
