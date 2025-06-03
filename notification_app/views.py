@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -79,6 +80,97 @@ class UpdateAllNotificationsReadStatusView(APIView):
                 "message": 'A database error occurred while updating notifications.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        except Exception as e:
+            return Response({
+                "message": f'An unexpected error occurred: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DeleteSingleNotificationView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        user = get_user_from_token(request)
+
+        if not user:
+            return Response({"message": "Authentication failed: User not found."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            # Get the notification, ensuring it belongs to the authenticated user
+            notification = get_object_or_404(Notification, pk=pk, user=user)
+            notification_id = notification.id # Store ID before deletion for response
+            notification.delete()
+            return Response({'message': f'Notification with ID {notification_id} deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+        except Notification.DoesNotExist:
+            return Response({"message": "Notification not found or does not belong to the user."}, status=status.HTTP_404_NOT_FOUND)
+        except DatabaseError:
+            return Response({
+                "message": 'A database error occurred while deleting the notification.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({
+                "message": f'An unexpected error occurred: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DeleteMultipleNotificationsView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request): # Using POST for batch deletion as DELETE with body can be tricky
+        user = get_user_from_token(request)
+
+        if not user:
+            return Response({"message": "Authentication failed: User not found."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        notification_ids = request.data.get('notification_ids', [])
+        if not isinstance(notification_ids, list):
+            return Response({"message": "Invalid data: 'notification_ids' must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not notification_ids:
+            return Response({"message": "No notification IDs provided for deletion."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Delete notifications that belong to the user and are in the provided list of IDs
+            deleted_count, _ = Notification.objects.filter(user=user, id__in=notification_ids).delete()
+
+            if deleted_count == 0:
+                return Response({"message": "No matching notifications found for deletion."}, status=status.HTTP_200_OK)
+
+            return Response({
+                'message': f'{deleted_count} notifications deleted successfully.'
+            }, status=status.HTTP_200_OK)
+        except DatabaseError:
+            return Response({
+                "message": 'A database error occurred while deleting multiple notifications.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({
+                "message": f'An unexpected error occurred: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DeleteAllNotificationsView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        user = get_user_from_token(request)
+
+        if not user:
+            return Response({"message": "Authentication failed: User not found."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            # Delete all notifications for the authenticated user
+            deleted_count, _ = Notification.objects.filter(user=user).delete()
+            return Response({
+                'message': f'{deleted_count} notifications deleted successfully for user {user.email}.'
+            }, status=status.HTTP_204_NO_CONTENT if deleted_count > 0 else status.HTTP_200_OK)
+        except DatabaseError:
+            return Response({
+                "message": 'A database error occurred while deleting all notifications.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
             return Response({
                 "message": f'An unexpected error occurred: {str(e)}'

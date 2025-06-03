@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from .views import DashboardView, UpdateUserProfileView, UpdateKYCView, ChangePasswordView
-from .viewsets import DailyTaskViewSet, TaskCompletionViewSet, UserRewardViewSet, UserActivityViewSet, LeisureAccessViewSet
+from .viewsets import DailyTaskViewSet, GiftViewSet, TaskCompletionViewSet, UserGiftViewSet, UserRewardViewSet, UserActivityViewSet, LeisureAccessViewSet
 
 router = DefaultRouter()
 router.register(r'tasks', DailyTaskViewSet)
@@ -10,6 +10,8 @@ router.register(r'task-completions', TaskCompletionViewSet)
 router.register(r'rewards', UserRewardViewSet)
 router.register(r'user-activities', UserActivityViewSet)
 router.register(r'leisure', LeisureAccessViewSet)
+router.register(r'gifts', GiftViewSet)
+router.register(r'user-gifts', UserGiftViewSet)
 
 
 urlpatterns = [

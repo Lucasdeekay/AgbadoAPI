@@ -222,3 +222,11 @@ CLOUDINARY_STORAGE = {
 }
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+# WebAuthn/FIDO2 Settings
+# This is the domain name of your application. Use "localhost" for local development.
+# For production, this MUST be your actual domain (e.g., "your-app.com").
+# RP_ID binds the credential to your origin, preventing phishing.
+WEBAUTHN_RP_ID = "https://lucasdennis.pythonanywhere.com" # Change to your domain in production (e.g., "api.yourdomain.com")
+WEBAUTHN_RP_NAME = "AGBA-DO" # Display name shown to the user during registration
+WEBAUTHN_ORIGINS = ["http://localhost:8000", "http://127.0.0.1:8000", "https://lucasdennis.pythonanywhere.com", "https://agbado.pythonanywhere.com"] # Add your Flutter app's origin if different from RP_ID, and your backend origin.

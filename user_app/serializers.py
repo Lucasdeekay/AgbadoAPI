@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import DailyTask, TaskCompletion, UserReward, UserActivity, LeisureAccess
+from .models import DailyTask, Gift, TaskCompletion, UserReward, UserActivity, LeisureAccess, UserGift
 
 
 # Serializer for DailyTask model
@@ -37,3 +37,18 @@ class LeisureAccessSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeisureAccess
         fields = ('user', 'is_verified', 'verified_at')
+
+class GiftSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Gift
+        fields = '__all__'
+
+class UserGiftSerializer(serializers.ModelSerializer):
+    user_email = serializers.ReadOnlyField(source='user.email')
+    gift_name = serializers.ReadOnlyField(source='gift.name')
+    gift_image = serializers.ImageField(source='gift.image', read_only=True)
+
+    class Meta:
+        model = UserGift
+        fields = '__all__'
+        

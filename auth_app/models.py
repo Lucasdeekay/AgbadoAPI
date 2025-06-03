@@ -44,6 +44,22 @@ class User(AbstractUser):
         return self.email
 
 
+# New model for WebAuthn Credentials
+class WebAuthnCredential(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='webauthn_credentials')
+    credential_id = models.CharField(max_length=255, unique=True, db_index=True) # Identifier for the credential
+    public_key = models.TextField() # Base64URL encoded public key
+    sign_count = models.BigIntegerField(default=0) # Counter to prevent replay attacks
+    transports = models.CharField(max_length=100, blank=True, null=True) # e.g., 'usb,nfc,ble,internal'
+    # Flags: `uv` (user verified), `up` (user present)
+    # Consider adding `device_name` or `last_used` for better UX/security management
+    registered_at = models.DateTimeField(auto_now_add=True)
+    last_used = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Credential for {self.user.email} - ID: {self.credential_id[:10]}..."
+
+
 class KYC(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="kyc")
     national_id = models.ImageField(upload_to='national_id/', null=True, blank=True)

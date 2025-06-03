@@ -60,3 +60,29 @@ class UserActivity(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - Activity: {self.activity_type}"
+
+class Gift(models.Model):
+    name = models.CharField(max_length=255)
+    image = models.ImageField(upload_to='gifts/')
+    coin_amount = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+class UserGift(models.Model):
+    DELIVERY_STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Shipped', 'Shipped'),
+        ('Delivered', 'Delivered'),
+        ('Cancelled', 'Cancelled'),
+    ]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="won_gifts")
+    gift = models.ForeignKey(Gift, on_delete=models.CASCADE, related_name="winners")
+    date_won = models.DateTimeField(auto_now_add=True)
+    delivery_status = models.CharField(max_length=20, choices=DELIVERY_STATUS_CHOICES, default='Pending')
+    delivery_date = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.email} won {self.gift.name}"
+    
