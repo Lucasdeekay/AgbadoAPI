@@ -3,6 +3,8 @@ import re
 from django.core.mail import send_mail
 import requests
 
+from decouple import config
+
 from agbado import settings
 from .models import OTP
 
@@ -27,29 +29,30 @@ def send_otp_email(user, otp):
 
 
 def format_phone_number(phone_number: str) -> str:
-    """Format phone number to E.164 standard (e.g., 2349024563447)"""
+    """
+    Formats a phone number to E.164 standard (e.g., 2349024563447).
+    Removes non-digits, leading zeros, and prepends '234' if needed.
+    """
     phone_number = phone_number.strip()  # Remove spaces
     phone_number = re.sub(r"\D", "", phone_number)  # Remove non-digit characters
 
-    # Remove leading 0 if it starts with 0
+    # Remove leading 0 if it starts with 0 (e.g., "080..." -> "80...")
     if phone_number.startswith("0"):
         phone_number = phone_number[1:]
 
-    # Ensure it starts with 234 (Nigeria)
-    # The original logic for '+234' was a bit off for the desired output.
-    # Let's adjust it.
+    # Ensure it starts with 234 (Nigeria's country code)
     if phone_number.startswith("234"):
-        # Already starts with 234, no need to do anything
+        # Already starts with 234
         pass
-    elif phone_number.startswith("+234"): # This part was slightly incorrect in original.
-        phone_number = phone_number[1:] # Remove the leading '+'
+    elif phone_number.startswith("+234"):
+        # Remove the leading '+' (e.g., "+234..." -> "234...")
+        phone_number = phone_number[1:]
     else:
-        # If it's a Nigerian number without 234 or +234, prepend 234
+        # If it's a local Nigerian number without the 234 prefix, prepend it.
         # This assumes numbers without 234 prefix are Nigerian.
-        # You might need more robust country-code detection for international apps.
         phone_number = "234" + phone_number
 
-    return phone_number # Removed f-string as it's not strictly necessary here
+    return phone_number
 
 def send_otp_sms(user, otp):
     """
@@ -64,7 +67,7 @@ def send_otp_sms(user, otp):
     Returns:
         dict or None: A dictionary containing the API response on success, None on failure.
     """
-    api_key = settings.TERMII_LIVE_KEY
+    api_key = config('TERMII_LIVE_KEY')
     api_url = "https://v3.api.termii.com/api/sms/send"
 
     if not api_key:
@@ -77,7 +80,7 @@ def send_otp_sms(user, otp):
 
     payload = {
         "to": user.phone_number,
-        "from": 'Agba-do!',
+        "from": 'Agba do',
         "sms": f'Your OTP to reset your password is: {otp}',
         "type": "plain",
         "channel": "generic",
@@ -109,3 +112,4 @@ def write_to_file(file_path, message, error=None):
             file.write("-" * 50 + "\n")  # Separator for readability
     except Exception as e:
         print(f"Failed to write to file: {e}")
+
