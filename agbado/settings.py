@@ -24,9 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG')
+DEBUG = config('DEBUG', default=False, cast=bool) # Ensure DEBUG is cast to bool and has a default
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=lambda v: [s.strip() for s in v.split(',')])
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=lambda v: [s.strip() for s in v.split(',')], default='*')
 
 # Application definition
 
@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'cloudinary_storage', # IMPORTANT: Add this BEFORE django.contrib.staticfiles
     'django.contrib.staticfiles',
     'auth_app',
     'user_app',
@@ -45,28 +46,26 @@ INSTALLED_APPS = [
     'notification_app',
     'social_django',
     'corsheaders',
-    'rest_framework',  # Add this for DRF setup
+    'rest_framework', # Add this for DRF setup
     'rest_framework.authtoken',
-    # 'coreapi',  # Coreapi for coreapi documentation
-    # 'drf_yasg',  # drf_yasg for Swagger documentation
+    # 'coreapi', # Coreapi for coreapi documentation
+    # 'drf_yasg', # drf_yasg for Swagger documentation
     'channels',
     'django_filters',
-    'cloudinary',
-    'cloudinary_storage',
+    'cloudinary', # Often needed for direct Cloudinary access in models/views
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    # 'django.middleware.csrf.CsrfViewMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.middleware.http.ConditionalGetMiddleware',
-    'django.middleware.common.BrokenLinkEmailsMiddleware',
-    'django.middleware.common.CommonMiddleware',
+    'corsheaders.middleware.CorsMiddleware', # IMPORTANT: Place this high up, usually after SecurityMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware', # Uncomment if you need CSRF protection (e.g., for Django forms)
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.http.ConditionalGetMiddleware',
+    'django.middleware.common.BrokenLinkEmailsMiddleware', # Often can be removed if not needed
 ]
 
 ROOT_URLCONF = 'agbado.urls'
@@ -82,6 +81,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'social_django.context_processors.backends', # For social_django
+                'social_django.context_processors.login_redirect', # For social_django
             ],
         },
     },
@@ -92,6 +93,8 @@ WSGI_APPLICATION = 'agbado.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+# It's better to configure DATABASES using DATABASE_URL or similar for production
+# and a local sqlite for development.
 if DEBUG:
     DATABASES = {
         'default': {
@@ -99,11 +102,6 @@ if DEBUG:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-
-    MEDIA_ROOT = os.path.join(BASE_DIR, "media/")
-
-    MEDIA_URL = "/media/"
-
 else:
     DATABASES = {
         'default': {
@@ -112,26 +110,43 @@ else:
             'USER': config('DB_USER'),
             'PASSWORD': config('DB_PASSWORD'),
             'HOST': config('DB_HOST', default='localhost'),
-            'PORT': config('DB_PORT', default='3306'),
+            'PORT': config('DB_PORT', default='3306', cast=int), # Cast port to int
         }
     }
 
-    CLOUDINARY_STORAGE = {
+# --- Cloudinary Configuration ---
+CLOUDINARY_STORAGE = {
     'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME'),
     'API_KEY': config('CLOUDINARY_API_KEY'),
     'API_SECRET': config('CLOUDINARY_API_SECRET'),
-    }
+}
 
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+# Configure default file storage to Cloudinary
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+# Configure static files storage to Cloudinary
+STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticCloudinaryStorage'
+
+# Define STATIC_URL and MEDIA_URL globally.
+# These are used by Django to generate URLs, even when Cloudinary stores the files.
+STATIC_URL = '/static/'
+MEDIA_URL = '/media/'
+
+# STATIC_ROOT is where `collectstatic` will gather files locally before uploading to Cloudinary
+# It's needed for `collectstatic` to work with Cloudinary.
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Optional: If you had local media files you wanted to manage before Cloudinary
+# MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # Email
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
-EMAIL_PORT = config('EMAIL_PORT')
+EMAIL_PORT = config('EMAIL_PORT', cast=int) # Ensure port is an integer
 EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = 'no-reply@yourapp.com'
+DEFAULT_FROM_EMAIL = 'no-reply@yourapp.com' # Change to your actual sender email
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -162,15 +177,6 @@ USE_I18N = True
 
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
-
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIR = [
-    os.path.join(BASE_DIR, 'static')
-]
-
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -179,41 +185,50 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10,  # You can adjust the page size based on your requirements
+    'PAGE_SIZE': 10, # You can adjust the page size based on your requirements
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
     # 'DEFAULT_AUTHENTICATION_CLASSES': [
-    #     'rest_framework.authentication.TokenAuthentication',  # For token-based authentication
+    # 'rest_framework.authentication.TokenAuthentication', # For token-based authentication
     # ],
     # 'DEFAULT_PERMISSION_CLASSES': [
-    #     'rest_framework.permissions.IsAuthenticated',  # Ensure only authenticated users can access the API
+    # 'rest_framework.permissions.IsAuthenticated', # Ensure only authenticated users can access the API
     # ],
-    #     'DEFAULT_RENDERER_CLASSES': [
-    #         'rest_framework.renderers.JSONRenderer',  # Ensure seamless communication with the mobile app
-    #     ],
+    # 'DEFAULT_RENDERER_CLASSES': [
+    # 'rest_framework.renderers.JSONRenderer', # Ensure seamless communication with the mobile app
+    # ],
 }
 
-SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
-SECURE_HSTS_SECONDS = 31536000  # Enable HSTS (1 year)
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # Include subdomains
-SECURE_HSTS_PRELOAD = True  # Allow browsers to preload HSTS
-SECURE_BROWSER_XSS_FILTER = True  # Prevent XSS attacks
-SECURE_CONTENT_TYPE_NOSNIFF = True  # Prevent content-type sniffing
-X_FRAME_OPTIONS = 'DENY'  # Prevent clickjacking
+# Security Headers (Good for production)
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool) # Use config for production
+SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=0, cast=int) # Use config for production
+SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False, cast=bool) # Use config for production
+SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=False, cast=bool) # Use config for production
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'no-referrer-when-downgrade'
-CSRF_COOKIE_SECURE = True
-# CSRF_TRUSTED_ORIGINS = ['https://yourdomain.com']
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool) # Use config for production
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool) # Ensure session cookies are secure
 
-CORS_ALLOW_CREDENTIALS = True  # Only if cookies or credentials are needed
-CORS_ALLOW_ALL_ORIGINS = True
-# CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', cast=lambda v: [s.strip() for s in v.split(',')])
+# CORS Headers Configuration
+# IMPORTANT: DO NOT use CORS_ALLOW_ALL_ORIGINS = True in production.
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
 
+if not CORS_ALLOW_ALL_ORIGINS:
+    CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', cast=lambda v: [s.strip() for s in v.split(',')], default='').split(',')
+    CORS_ALLOWED_ORIGIN_REGEXES = config('CORS_ALLOWED_ORIGIN_REGEXES', cast=lambda v: [s.strip() for s in v.split(',')], default='').split(',')
+
+
+CORS_ALLOW_CREDENTIALS = True # Only if cookies or credentials are needed
+
+# Channels
 ASGI_APPLICATION = 'agbado.asgi.application'
 
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [("127.0.0.1", 6379)], # Adjust for production Redis URL
         },
     },
 }
@@ -222,15 +237,14 @@ AUTH_USER_MODEL = 'auth_app.User'
 
 TERMII_LIVE_KEY = config('TERMII_LIVE_KEY')
 
-
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
-
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760 # 10 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760 # 10 MB
 
 # WebAuthn/FIDO2 Settings
 # This is the domain name of your application. Use "localhost" for local development.
 # For production, this MUST be your actual domain (e.g., "your-app.com").
 # RP_ID binds the credential to your origin, preventing phishing.
-WEBAUTHN_RP_ID = "https://lucasdennis.pythonanywhere.com" # Change to your domain in production (e.g., "api.yourdomain.com")
-WEBAUTHN_RP_NAME = "AGBA-DO" # Display name shown to the user during registration
-WEBAUTHN_ORIGINS = ["http://localhost:8000", "http://127.0.0.1:8000", "https://lucasdennis.pythonanywhere.com", "https://agbado.pythonanywhere.com"] # Add your Flutter app's origin if different from RP_ID, and your backend origin.
+WEBAUTHN_RP_ID = config('WEBAUTHN_RP_ID', default="localhost") # Use config for flexibility
+WEBAUTHN_RP_NAME = config('WEBAUTHN_RP_NAME', default="AGBA-DO") # Use config for flexibility
+WEBAUTHN_ORIGINS = config('WEBAUTHN_ORIGINS', cast=lambda v: [s.strip() for s in v.split(',')], default="http://localhost:8000,http://127.0.0.1:8000") # Use config for flexibility
+
