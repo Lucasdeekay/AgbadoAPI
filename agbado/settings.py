@@ -255,18 +255,3 @@ WEBAUTHN_RP_ID = config('WEBAUTHN_RP_ID', default="localhost") # Use config for 
 WEBAUTHN_RP_NAME = config('WEBAUTHN_RP_NAME', default="AGBA-DO") # Use config for flexibility
 WEBAUTHN_ORIGINS = config('WEBAUTHN_ORIGINS', cast=lambda v: [s.strip() for s in v.split(',')], default="http://localhost:8000,http://127.0.0.1:8000") # Use config for flexibility
 
-
-# --- Diagnostic Print (Temporary) ---
-try:
-    from django.core.files.storage import get_storage_class
-    static_storage_class = get_storage_class(STATICFILES_STORAGE)
-    static_storage_instance = static_storage_class()
-    print(f"DEBUG: STATICFILES_STORAGE class: {static_storage_class}")
-    print(f"DEBUG: STATICFILES_STORAGE instance type: {type(static_storage_instance)}")
-    if hasattr(static_storage_instance, 'connection'):
-        print(f"DEBUG: Cloudinary connection details: {static_storage_instance.connection.config}")
-    else:
-        print("DEBUG: Cloudinary storage instance does not have a 'connection' attribute (might be normal).")
-except Exception as e:
-    print(f"DEBUG: Error during storage diagnostic: {e}")
-# --- End Diagnostic Print ---
