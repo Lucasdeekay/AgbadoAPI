@@ -18,6 +18,12 @@ from notification_app.models import Notification
 from wallet_app.models import Wallet, Transaction
 from wallet_app.serializers import TransactionSerializer
 
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class DashboardView(APIView):
     authentication_classes = [TokenAuthentication]
@@ -108,7 +114,8 @@ class UpdateUserProfileView(APIView):
                 user.state = state
             if profile_picture:
                 cloud_url = upload_to_cloudinary(profile_picture, folder="profile_pictures")
-                print(cloud_url)
+                logger.info(f"Uploaded image URL: {cloud_url}")
+
                 user.profile_picture = cloud_url
 
             user.save()
