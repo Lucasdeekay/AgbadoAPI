@@ -12,7 +12,7 @@ from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 
 from auth_app.models import KYC
-from auth_app.utils import upload_to_cloudinary, write_to_file
+from auth_app.utils import log_to_server, upload_to_cloudinary, write_to_file
 from auth_app.views import get_user_from_token
 from notification_app.models import Notification
 from wallet_app.models import Wallet, Transaction
@@ -114,7 +114,7 @@ class UpdateUserProfileView(APIView):
                 user.state = state
             if profile_picture:
                 cloud_url = upload_to_cloudinary(profile_picture, folder="profile_pictures")
-                write_to_file(f"Uploaded image URL: {cloud_url}")
+                log_to_server(f"Uploaded image URL: {cloud_url}")
 
                 user.profile_picture = cloud_url
 

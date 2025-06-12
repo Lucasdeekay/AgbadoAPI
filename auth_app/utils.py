@@ -1,3 +1,5 @@
+from datetime import datetime
+import os
 import random
 import re
 from django.core.mail import send_mail
@@ -117,6 +119,30 @@ def write_to_file(message, error=None):
         print(f"Failed to write to file: {e}")
 
 
+def log_to_server(message, error=None, log_file_path="agbado.log"):
+    """
+    Logs a message (and optional error) to a log file.
+
+    Args:
+        message (str): The message to log.
+        error (str, optional): Error message if applicable.
+        log_file_path (str): Relative or absolute path to the log file.
+    """
+    log_dir = os.path.dirname(log_file_path)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with open(log_file_path, "a") as log_file:
+            log_file.write(f"[{timestamp}] MESSAGE: {message}\n")
+            if error:
+                log_file.write(f"[{timestamp}] ERROR: {error}\n")
+            log_file.write("-" * 60 + "\n")
+    except Exception as e:
+        print(f"Failed to write to log file: {e}")
+
+
 def upload_to_cloudinary(image_file):
     cloud_name = config("CLOUDINARY_CLOUD_NAME")
     api_key = config("CLOUDINARY_API_KEY")
@@ -134,7 +160,7 @@ def upload_to_cloudinary(image_file):
     }
 
     response = requests.post(upload_url, files=files, data=data)
-    write_to_file(f'{response.json()}')
+    log_to_server(f'{response.json()}')
 
     if response.status_code == 200:
         return response.json()["secure_url"]
