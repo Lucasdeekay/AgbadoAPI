@@ -150,8 +150,11 @@ def upload_to_cloudinary(image_file):
 
     upload_url = f"https://api.cloudinary.com/v1_1/{cloud_name}/image/upload"
 
+    # Rewind in case it’s already been read
+    image_file.seek(0)
+
     files = {
-        "file": image_file.read(),  # or image_file if already raw bytes
+        "file": image_file,  # Don't use .read() — just pass the file object directly
     }
 
     data = {
