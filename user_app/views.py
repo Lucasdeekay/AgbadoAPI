@@ -114,7 +114,7 @@ class UpdateUserProfileView(APIView):
                 user.state = state
             if profile_picture:
                 cloud_url = upload_to_cloudinary(profile_picture, folder="profile_pictures")
-                logger.info(f"Uploaded image URL: {cloud_url}")
+                logger.error(f"Uploaded image URL: {cloud_url}")
 
                 user.profile_picture = cloud_url
 
