@@ -2,7 +2,10 @@ import random
 import re
 from django.core.mail import send_mail
 import requests
-
+import hashlib
+import time
+import base64
+import hmac
 from decouple import config
 
 from agbado import settings
@@ -113,3 +116,26 @@ def write_to_file(file_path, message, error=None):
     except Exception as e:
         print(f"Failed to write to file: {e}")
 
+
+def upload_to_cloudinary(image_file):
+    cloud_name = config("CLOUDINARY_CLOUD_NAME")
+    api_key = config("CLOUDINARY_API_KEY")
+    upload_preset = config("CLOUDINARY_UPLOAD_PRESET")
+
+    upload_url = f"https://api.cloudinary.com/v1_1/{cloud_name}/image/upload"
+
+    files = {
+        "file": image_file.read(),  # or image_file if already raw bytes
+    }
+
+    data = {
+        "api_key": api_key,
+        "upload_preset": upload_preset,
+    }
+
+    response = requests.post(upload_url, files=files, data=data)
+
+    if response.status_code == 200:
+        return response.json()["secure_url"]
+    else:
+        raise Exception(f"Cloudinary upload failed: {response.text}")

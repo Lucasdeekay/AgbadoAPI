@@ -8,6 +8,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from auth_app.utils import upload_to_cloudinary
 from auth_app.views import get_user_from_token
 from notification_app.models import Notification
 from provider_app.models import ServiceProvider
@@ -147,183 +148,148 @@ class AddServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 
     def post(self, request):
-        try:
-            # Get the service provider profile
-            user = get_user_from_token(request)
-        
-            service_provider = ServiceProvider.objects.get(user=user)
+        user = get_user_from_token(request)
+        service_provider = ServiceProvider.objects.get(user=user)
 
-            name = request.data.get('name')
-            description = request.data.get('description')
-            category = request.data.get('category')
-            min_price = request.data.get('min_price')
-            max_price = request.data.get('max_price')
-            is_active = request.data.get('is_active', True) # Default to True if not provided
-            image = request.FILES.get('image') # Handle image upload
+        name = request.data.get('name')
+        description = request.data.get('description')
+        category = request.data.get('category')
+        min_price = request.data.get('min_price')
+        max_price = request.data.get('max_price')
+        is_active = request.data.get('is_active', True)
+        image = request.FILES.get('image')
 
-            service = Service.objects.create(
-                provider=service_provider,
-                name=name,
-                description=description,
-                category=category,
-                min_price=min_price,
-                max_price=max_price,
-                is_active=is_active,
-                image=image, # Save the uploaded image
-            )
+        if image:
+            image_url = upload_to_cloudinary(image, folder="services")
+        else:
+            image_url = None
 
-            service_data = {
-                'name': service.name,
-                'description': service.description,
-                'category': service.category,
-                'min_price': str(service.min_price),
-                'max_price': str(service.max_price),
-                'is_active': service.is_active,
-                'image': service.image.url if service.image else None,
-                'created_at': service.created_at.isoformat(),
-            }
+        service = Service.objects.create(
+            provider=service_provider,
+            name=name,
+            description=description,
+            category=category,
+            min_price=min_price,
+            max_price=max_price,
+            is_active=is_active,
+            image=image_url,
+        )
 
-            Notification.objects.create(
-                user=user,
-                title="New Service Added",
-                message=f"You have added a new service: {service.name}"
-            )
+        Notification.objects.create(
+            user=user,
+            title="New Service Added",
+            message=f"You have added a new service: {service.name}"
+        )
 
-            return Response({"message": "Service added successfully.", "service": service_data}, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        service_data = {
+            'id': service.id,
+            'name': service.name,
+            'description': service.description,
+            'category': service.category,
+            'min_price': str(service.min_price),
+            'max_price': str(service.max_price),
+            'is_active': service.is_active,
+            'image': service.image,
+            'created_at': service.created_at.isoformat(),
+        }
+        return Response({"message": "Service added successfully.", "service": service_data}, status=status.HTTP_201_CREATED)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AddSubServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 
     def post(self, request, service_id):
-        try:
-            user = get_user_from_token(request)
+        user = get_user_from_token(request)
+        service = get_object_or_404(Service, id=service_id)
 
-            service = get_object_or_404(Service, id=service_id)
+        name = request.data.get('name')
+        description = request.data.get('description')
+        price = request.data.get('price')
+        is_active = request.data.get('is_active', True)
+        image = request.FILES.get('image')
 
-            name = request.data.get('name')
-            description = request.data.get('description')
-            price = request.data.get('price')
-            is_active = request.data.get('is_active', True)
-            image = request.FILES.get('image')
+        image_url = upload_to_cloudinary(image, folder="services/subservices") if image else None
 
-            service = get_object_or_404(Service, id=service_id)
-            subservice = SubService.objects.create(
-                service=service,
-                name=name,
-                description=description,
-                price=price,
-                is_active=is_active,
-                image=image,
-            )
+        subservice = SubService.objects.create(
+            service=service,
+            name=name,
+            description=description,
+            price=price,
+            is_active=is_active,
+            image=image_url,
+        )
 
-            subservice_data = {
-                'name': subservice.name,
-                'description': subservice.description,
-                'price': str(subservice.price),
-                'is_active': subservice.is_active,
-                'image': subservice.image.url if subservice.image else None,
-                'created_at': subservice.created_at.isoformat(),
-            }
+        Notification.objects.create(
+            user=user,
+            title="New Subservice Added",
+            message=f"You have added a new subservice: {subservice.name}"
+        )
 
-            Notification.objects.create(
-                user=user,
-                title="New Service Added",
-                message=f"You have added a new service: {service.name}"
-            )
+        subservice_data = {
+            'id': subservice.id,
+            'name': subservice.name,
+            'description': subservice.description,
+            'price': str(subservice.price),
+            'is_active': subservice.is_active,
+            'image': subservice.image,
+            'created_at': subservice.created_at.isoformat(),
+        }
+        return Response({"message": "Subservice added successfully.", "subservice": subservice_data}, status=status.HTTP_201_CREATED)
 
-            return Response({"message": "Subservice added successfully.", "subservice": subservice_data}, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class EditServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 
     def post(self, request, service_id):
-        try:
-            user = get_user_from_token(request)
+        user = get_user_from_token(request)
+        service = get_object_or_404(Service, id=service_id)
 
-            service = get_object_or_404(Service, id=service_id)
+        if 'image' in request.FILES:
+            service.image = upload_to_cloudinary(request.FILES['image'], folder="services")
 
-            service.name = request.data.get('name', service.name)
-            service.description = request.data.get('description', service.description)
-            service.category = request.data.get('category', service.category)
-            service.min_price = request.data.get('min_price', service.min_price)
-            service.max_price = request.data.get('max_price', service.max_price)
-            service.is_active = request.data.get('is_active', service.is_active)
-            if 'image' in request.FILES:
-                service.image = request.FILES['image']
-            service.save()
+        for field in ['name', 'description', 'category', 'min_price', 'max_price', 'is_active']:
+            if field in request.data:
+                setattr(service, field, request.data.get(field))
 
-            service_data = {
-                'id': service.id,
-                'provider': service.provider.id,
-                'name': service.name,
-                'description': service.description,
-                'category': service.category,
-                'min_price': str(service.min_price),
-                'max_price': str(service.max_price),
-                'is_active': service.is_active,
-                'image': service.image.url if service.image else None,
-                'created_at': service.created_at.isoformat(),
-            }
+        service.save()
 
-            Notification.objects.create(
+        Notification.objects.create(
             user=user,
             title="Service Updated",
             message=f"You have updated the service: {service.name}"
         )
 
-            return Response({"message": "Service updated successfully.", "service": service_data}, status=status.HTTP_200_OK)
+        service_data = ServiceSerializer(service, context={'request': request}).data
+        return Response({"message": "Service updated successfully.", "service": service_data}, status=status.HTTP_200_OK)
 
-        except Exception as e:
-            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class EditSubServiceView(APIView):
     authentication_classes = [TokenAuthentication]
 
     def post(self, request, subservice_id):
-        try:
-            user = get_user_from_token(request)
+        user = get_user_from_token(request)
+        subservice = get_object_or_404(SubService, id=subservice_id)
 
-            subservice = get_object_or_404(SubService, id=subservice_id)
+        if 'image' in request.FILES:
+            subservice.image = upload_to_cloudinary(request.FILES['image'], folder="services/subservices")
 
-            subservice.service = get_object_or_404(Service, id=request.data.get('service'))
-            subservice.name = request.data.get('name', subservice.name)
-            subservice.description = request.data.get('description', subservice.description)
-            subservice.price = request.data.get('price', subservice.price)
-            subservice.is_active = request.data.get('is_active', subservice.is_active)
-            if 'image' in request.FILES:
-                subservice.image = request.FILES['image']
-            subservice.save()
+        for field in ['name', 'description', 'price', 'is_active', 'service']:
+            if field in request.data:
+                setattr(subservice, field, request.data.get(field))
 
-            subservice_data = {
-                'id': subservice.id,
-                'service': subservice.service.id,
-                'name': subservice.name,
-                'description': subservice.description,
-                'price': str(subservice.price),
-                'is_active': subservice.is_active,
-                'image': subservice.image.url if subservice.image else None,
-                'created_at': subservice.created_at.isoformat(),
-            }
+        subservice.save()
 
-            Notification.objects.create(
+        Notification.objects.create(
             user=user,
             title="Subservice Updated",
             message=f"You have updated the subservice: {subservice.name}"
         )
 
-            return Response({"message": "Subservice updated successfully.", "subservice": subservice_data}, status=status.HTTP_200_OK)
+        subservice_data = SubServiceSerializer(subservice, context={'request': request}).data
+        return Response({"message": "Subservice updated successfully.", "subservice": subservice_data}, status=status.HTTP_200_OK)
 
-        except Exception as e:
-            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ServiceProviderBookingsView(APIView):

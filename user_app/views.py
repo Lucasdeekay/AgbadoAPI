@@ -12,7 +12,7 @@ from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 
 from auth_app.models import KYC
-from auth_app.utils import write_to_file
+from auth_app.utils import upload_to_cloudinary, write_to_file
 from auth_app.views import get_user_from_token
 from notification_app.models import Notification
 from wallet_app.models import Wallet, Transaction
@@ -107,7 +107,8 @@ class UpdateUserProfileView(APIView):
             if state:
                 user.state = state
             if profile_picture:
-                user.profile_picture = profile_picture
+                cloud_url = upload_to_cloudinary(profile_picture, folder="profile_pictures")
+                user.profile_picture = cloud_url
 
             user.save()
 
@@ -165,14 +166,15 @@ class UpdateKYCView(APIView):
 
         try:
             # Update fields if they are provided
-            if national_id:
-                kyc.national_id = national_id
             if bvn:
                 kyc.bvn = bvn
+            if national_id:
+                kyc.national_id = upload_to_cloudinary(national_id, folder="kyc/national_id")
             if driver_license:
-                kyc.driver_license = driver_license
+                kyc.driver_license = upload_to_cloudinary(driver_license, folder="kyc/driver_license")
             if proof_of_address:
-                kyc.proof_of_address = proof_of_address
+                kyc.proof_of_address = upload_to_cloudinary(proof_of_address, folder="kyc/proof_of_address")
+
 
             kyc.status = 'Pending'  # Reset status to 'Pending' after update
             kyc.updated_at = timezone.now()

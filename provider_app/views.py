@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
+from auth_app.utils import upload_to_cloudinary
 from auth_app.views import get_user_from_token
 from notification_app.models import Notification
 from provider_app.models import ServiceProvider
@@ -20,14 +21,12 @@ class CreateServiceProviderView(APIView):
     def post(self, request):
         user = get_user_from_token(request)
 
-        # Check if the user already has a provider profile
         if hasattr(user, "provider_profile"):
             return Response(
                 {"message": "User already has a provider profile."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Extract data from the request
         company_name = request.data.get("company_name")
         company_address = request.data.get("company_address")
         company_description = request.data.get("company_description")
@@ -38,7 +37,6 @@ class CreateServiceProviderView(APIView):
         opening_hour = request.data.get("opening_hour")
         closing_hour = request.data.get("closing_hour")
 
-        # Validate required fields
         if not company_name or not company_address or not business_category:
             return Response(
                 {"message": "All required fields must be provided."},
@@ -46,7 +44,10 @@ class CreateServiceProviderView(APIView):
             )
 
         try:
-            # Create the service provider profile
+            logo_url = None
+            if company_logo:
+                logo_url = upload_to_cloudinary(company_logo, folder="company_logos")
+
             service_provider = ServiceProvider.objects.create(
                 user=user,
                 company_name=company_name,
@@ -55,12 +56,10 @@ class CreateServiceProviderView(APIView):
                 company_phone_no=company_phone_no,
                 company_email=company_email,
                 business_category=business_category,
-                company_logo=company_logo,
+                company_logo=logo_url,
                 opening_hour=opening_hour,
                 closing_hour=closing_hour,
             )
-
-            service_provider.save()
 
             Notification.objects.create(
                 user=user,
@@ -84,6 +83,7 @@ class CreateServiceProviderView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+
 @method_decorator(csrf_exempt, name='dispatch')
 class EditServiceProviderView(APIView):
     authentication_classes = [TokenAuthentication]
@@ -92,7 +92,6 @@ class EditServiceProviderView(APIView):
     def post(self, request):
         user = get_user_from_token(request)
 
-        # Get the service provider profile
         try:
             service_provider = user.provider_profile
         except ServiceProvider.DoesNotExist:
@@ -101,7 +100,6 @@ class EditServiceProviderView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Extract data from the request
         company_name = request.data.get("company_name")
         company_address = request.data.get("company_address")
         company_description = request.data.get("company_description")
@@ -112,7 +110,6 @@ class EditServiceProviderView(APIView):
         opening_hour = request.data.get("opening_hour")
         closing_hour = request.data.get("closing_hour")
 
-        # Handle empty requests gracefully
         if not any([company_name, company_address, company_description, company_phone_no, company_email, business_category, company_logo, opening_hour, closing_hour]):
             return Response(
                 {"message": "No data provided to update."},
@@ -120,7 +117,6 @@ class EditServiceProviderView(APIView):
             )
 
         try:
-            # Update fields if they are provided
             if company_name:
                 service_provider.company_name = company_name
             if company_address:
@@ -134,7 +130,8 @@ class EditServiceProviderView(APIView):
             if business_category:
                 service_provider.business_category = business_category
             if company_logo:
-                service_provider.company_logo = company_logo
+                logo_url = upload_to_cloudinary(company_logo, folder="company_logos")
+                service_provider.company_logo = logo_url
             if opening_hour:
                 service_provider.opening_hour = opening_hour
             if closing_hour:
