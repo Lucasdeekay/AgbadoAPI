@@ -34,7 +34,7 @@ class GetAllServicesDetailsView(APIView):
                 "company_phone_no": service_provider.company_phone_no,
                 "company_email": service_provider.company_email,
                 "business_category": service_provider.business_category,
-                "company_logo": request.build_absolute_uri(service_provider.company_logo.url) if service_provider.company_logo else None,
+                "company_logo": service_provider.company_logo,
                 "opening_hour": service_provider.opening_hour,
                 "closing_hour": service_provider.closing_hour,
                 "avg_rating": service_provider.avg_rating,
@@ -49,7 +49,7 @@ class GetAllServicesDetailsView(APIView):
                 "provider": service.provider.id,
                 "name": service.name,
                 "description": service.description,
-                "image": request.build_absolute_uri(service.image.url) if service.image else None,
+                "image": service.image,
                 "category": service.category,
                 "min_price": service.min_price,
                 "max_price": service.max_price,
@@ -90,7 +90,7 @@ class GetServiceDetailsView(APIView):
                 "provider": service.provider.id,
                 "name": service.name,
                 "description": service.description,
-                "image": request.build_absolute_uri(service.image.url) if service.image else None,
+                "image": service.image,
                 "category": service.category,
                 "min_price": service.min_price,
                 "max_price": service.max_price,
@@ -105,7 +105,7 @@ class GetServiceDetailsView(APIView):
                 "name": subservice.name,
                 "description": subservice.description,
                 "price": subservice.price,
-                "image": request.build_absolute_uri(subservice.image.url) if subservice.image else None,
+                "image": subservice.image,
                 "is_active": subservice.is_active,
                 "created_at": subservice.created_at,
             } for subservice in subservices]
@@ -131,7 +131,7 @@ class GetSubServiceDetailsView(APIView):
                 "name": subservice.name,
                 "description": subservice.description,
                 "price": subservice.price,
-                "image": request.build_absolute_uri(subservice.image.url) if subservice.image else None,
+                "image": subservice.image,
                 "is_active": subservice.is_active,
                 "created_at": subservice.created_at,
             }
@@ -160,7 +160,7 @@ class AddServiceView(APIView):
         image = request.FILES.get('image')
 
         if image:
-            image_url = upload_to_cloudinary(image, folder="services")
+            image_url = upload_to_cloudinary(image)
         else:
             image_url = None
 
@@ -208,7 +208,7 @@ class AddSubServiceView(APIView):
         is_active = request.data.get('is_active', True)
         image = request.FILES.get('image')
 
-        image_url = upload_to_cloudinary(image, folder="services/subservices") if image else None
+        image_url = upload_to_cloudinary(image) if image else None
 
         subservice = SubService.objects.create(
             service=service,
@@ -246,7 +246,7 @@ class EditServiceView(APIView):
         service = get_object_or_404(Service, id=service_id)
 
         if 'image' in request.FILES:
-            service.image = upload_to_cloudinary(request.FILES['image'], folder="services")
+            service.image = upload_to_cloudinary(request.FILES['image'])
 
         for field in ['name', 'description', 'category', 'min_price', 'max_price', 'is_active']:
             if field in request.data:
@@ -273,7 +273,7 @@ class EditSubServiceView(APIView):
         subservice = get_object_or_404(SubService, id=subservice_id)
 
         if 'image' in request.FILES:
-            subservice.image = upload_to_cloudinary(request.FILES['image'], folder="services/subservices")
+            subservice.image = upload_to_cloudinary(request.FILES['image'])
 
         for field in ['name', 'description', 'price', 'is_active', 'service']:
             if field in request.data:

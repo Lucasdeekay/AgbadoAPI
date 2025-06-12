@@ -109,7 +109,7 @@ class UpdateUserProfileView(APIView):
             if state:
                 user.state = state
             if profile_picture:
-                cloud_url = upload_to_cloudinary(profile_picture, folder="profile_pictures")
+                cloud_url = upload_to_cloudinary(profile_picture)
                 log_to_server(f"Uploaded image URL: {cloud_url}")
 
                 user.profile_picture = cloud_url
@@ -173,11 +173,11 @@ class UpdateKYCView(APIView):
             if bvn:
                 kyc.bvn = bvn
             if national_id:
-                kyc.national_id = upload_to_cloudinary(national_id, folder="kyc/national_id")
+                kyc.national_id = upload_to_cloudinary(national_id)
             if driver_license:
-                kyc.driver_license = upload_to_cloudinary(driver_license, folder="kyc/driver_license")
+                kyc.driver_license = upload_to_cloudinary(driver_license)
             if proof_of_address:
-                kyc.proof_of_address = upload_to_cloudinary(proof_of_address, folder="kyc/proof_of_address")
+                kyc.proof_of_address = upload_to_cloudinary(proof_of_address)
 
 
             kyc.status = 'Pending'  # Reset status to 'Pending' after update

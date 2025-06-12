@@ -46,7 +46,7 @@ class CreateServiceProviderView(APIView):
         try:
             logo_url = None
             if company_logo:
-                logo_url = upload_to_cloudinary(company_logo, folder="company_logos")
+                logo_url = upload_to_cloudinary(company_logo)
 
             service_provider = ServiceProvider.objects.create(
                 user=user,
@@ -130,7 +130,7 @@ class EditServiceProviderView(APIView):
             if business_category:
                 service_provider.business_category = business_category
             if company_logo:
-                logo_url = upload_to_cloudinary(company_logo, folder="company_logos")
+                logo_url = upload_to_cloudinary(company_logo)
                 service_provider.company_logo = logo_url
             if opening_hour:
                 service_provider.opening_hour = opening_hour
@@ -186,7 +186,7 @@ class GetServiceProviderDetailsView(APIView):
             "company_phone_no": service_provider.company_phone_no,
             "company_email": service_provider.company_email,
             "business_category": service_provider.business_category,
-            "company_logo": request.build_absolute_uri(service_provider.company_logo.url) if service_provider.company_logo else None,
+            "company_logo": service_provider.company_logo,
             "opening_hour": service_provider.opening_hour,
             "closing_hour": service_provider.closing_hour,
             "is_approved": service_provider.is_approved,
