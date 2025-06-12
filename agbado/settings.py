@@ -141,7 +141,7 @@ STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticCloudinaryStorage'
 # These are used by Django to build URLs for your files.
 # CloudinaryStorage will override the actual URL generation to point to Cloudinary.
 STATIC_URL = '/static/'
-MEDIA_URL = '/media/'
+# MEDIA_URL = '/media/'
 
 # STATIC_ROOT is where `collectstatic` will gather files locally *before* they are
 # uploaded to Cloudinary by `STATICFILES_STORAGE`. This directory will be created
@@ -149,7 +149,6 @@ MEDIA_URL = '/media/'
 # For production with Cloudinary, this can be a temporary staging area.
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_build')
 
-MEDIA_URL = '/media/'  # or any prefix you choose
 # MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # STATIC_ROOT is where `collectstatic` will gather files locally before uploading to Cloudinary
