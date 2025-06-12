@@ -27,7 +27,7 @@ class ServiceProvider(models.Model):
     company_phone_no = models.CharField(max_length=20)
     company_email = models.EmailField()
     business_category = models.CharField(max_length=100, choices=CATEGORIES)  # Updated to use choices
-    company_logo = models.ImageField(upload_to='company_logos/', null=True, blank=True)
+    company_logo = models.URLField(null=True, blank=True)
     opening_hour = models.CharField(max_length=10)
     closing_hour = models.CharField(max_length=10)
     avg_rating = models.PositiveIntegerField(default=0, null=True, blank=True)

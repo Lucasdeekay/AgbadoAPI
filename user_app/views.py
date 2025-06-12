@@ -42,11 +42,7 @@ class DashboardView(APIView):
                 "state": user.state,
                 "is_verified": user.is_verified,
                 "paystack_key": config('PAYSTACK_SECRET_KEY'),
-                "profile_picture": (
-                    request.build_absolute_uri(user.profile_picture.url)
-                    if user.profile_picture and user.profile_picture.url
-                    else None
-                ),
+                "profile_picture": user.profile_picture,
             }
         except Exception as e:
             return Response({"message": f"Error fetching user details: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
