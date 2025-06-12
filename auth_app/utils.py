@@ -99,7 +99,7 @@ def send_otp_sms(user, otp):
         return None
 
 
-def write_to_file(file_path, message, error=None):
+def write_to_file(message, error=None):
     """
     Writes a message and an optional error to a file.
     
@@ -108,7 +108,7 @@ def write_to_file(file_path, message, error=None):
     :param error: (Optional) Error message to log.
     """
     try:
-        with open(file_path, "a") as file:
+        with open("file.txt", "a") as file:
             file.write(f"Message: {message}\n")
             if error:
                 file.write(f"Error: {error}\n")
