@@ -163,7 +163,7 @@ def upload_to_cloudinary(image_file):
     }
 
     response = requests.post(upload_url, files=files, data=data)
-    log_to_server(f'{response.json()}')
+    print(f'{response.json()}')
 
     if response.status_code == 200:
         return response.json()["secure_url"]

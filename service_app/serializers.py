@@ -1,4 +1,6 @@
 from rest_framework import serializers
+
+from auth_app.utils import upload_to_cloudinary
 from .models import Service, SubService, ServiceRequest, ServiceRequestBid, Booking
 from django.conf import settings  # Import settings for MEDIA_URL
 
@@ -12,13 +14,21 @@ class ServiceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_image(self, obj):
-        request = self.context.get('request')
-        if obj.image and obj.image.url:
-            return request.build_absolute_uri(obj.image.url)
-        return None
+        return obj.image if isinstance(obj.image, str) else None
+
+    def create(self, validated_data):
+        image_file = self.context['request'].FILES.get('image')
+        if image_file:
+            validated_data['image'] = upload_to_cloudinary(image_file)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        image_file = self.context['request'].FILES.get('image')
+        if image_file:
+            validated_data['image'] = upload_to_cloudinary(image_file)
+        return super().update(instance, validated_data)
 
 
-# Serializer for SubService model
 class SubServiceSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
 
@@ -27,37 +37,53 @@ class SubServiceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_image(self, obj):
-        request = self.context.get('request')
-        if obj.image and obj.image.url:
-            return request.build_absolute_uri(obj.image.url)
-        return None
+        return obj.image if isinstance(obj.image, str) else None
+
+    def create(self, validated_data):
+        image_file = self.context['request'].FILES.get('image')
+        if image_file:
+            validated_data['image'] = upload_to_cloudinary(image_file)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        image_file = self.context['request'].FILES.get('image')
+        if image_file:
+            validated_data['image'] = upload_to_cloudinary(image_file)
+        return super().update(instance, validated_data)
 
 
-# Serializer for ServiceRequest model
 class ServiceRequestSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
-    user = serializers.SerializerMethodField()  # Include user details
+    user = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceRequest
         fields = '__all__'
 
     def get_image(self, obj):
-        request = self.context.get('request')
-        if obj.image and obj.image.url:
-            return request.build_absolute_uri(obj.image.url)
-        return None
-    
+        return obj.image if isinstance(obj.image, str) else None
+
     def get_user(self, obj):
         request = self.context.get('request')
-        user_data = {
+        return {
             "id": obj.user.id,
             "email": obj.user.email,
             "first_name": obj.user.first_name,
             "last_name": obj.user.last_name,
-            "profile_picture": request.build_absolute_uri(obj.user.profile_picture.url) if obj.user.profile_picture and obj.user.profile_picture.url else None,
+            "profile_picture": obj.user.profile_picture,
         }
-        return user_data
+
+    def create(self, validated_data):
+        image_file = self.context['request'].FILES.get('image')
+        if image_file:
+            validated_data['image'] = upload_to_cloudinary(image_file)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        image_file = self.context['request'].FILES.get('image')
+        if image_file:
+            validated_data['image'] = upload_to_cloudinary(image_file)
+        return super().update(instance, validated_data)
 
 
 # Serializer for ServiceRequestBid model

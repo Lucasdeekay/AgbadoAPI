@@ -1,4 +1,6 @@
 from rest_framework import serializers
+
+from auth_app.utils import upload_to_cloudinary
 from .models import ServiceProvider
 
 
@@ -16,6 +18,20 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
 
     def get_company_logo(self, obj):
         request = self.context.get('request')
-        if obj.company_logo and obj.company_logo.url:
+        if obj.company_logo and hasattr(obj.company_logo, 'url'):
             return request.build_absolute_uri(obj.company_logo.url)
-        return None
+        return obj.company_logo  # fallback if already a URL string
+
+    def create(self, validated_data):
+        image_file = self.context['request'].FILES.get('company_logo')
+        if image_file:
+            image_url = upload_to_cloudinary(image_file)
+            validated_data['company_logo'] = image_url
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        image_file = self.context['request'].FILES.get('company_logo')
+        if image_file:
+            image_url = upload_to_cloudinary(image_file)
+            validated_data['company_logo'] = image_url
+        return super().update(instance, validated_data)

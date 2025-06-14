@@ -31,16 +31,14 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=lambda v: [s.strip() for s in v.spl
 # Application definition
 
 INSTALLED_APPS = [
-    # --- ADD CLOUDINARY APPS ---
-    'cloudinary',
     'cloudinary_storage',
-    # --- END CLOUDINARY APPS ---
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'cloudinary',
     'auth_app',
     'user_app',
     'provider_app',

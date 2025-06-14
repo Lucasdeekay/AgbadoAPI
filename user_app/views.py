@@ -94,6 +94,7 @@ class UpdateUserProfileView(APIView):
         phone_number = request.data.get('phone_number')
         state = request.data.get('state')
         profile_picture = request.FILES.get('profile_picture')
+        print(profile_picture)
 
         # Handle empty requests gracefully
         if not phone_number and not state and not profile_picture:
@@ -110,7 +111,7 @@ class UpdateUserProfileView(APIView):
                 user.state = state
             if profile_picture:
                 cloud_url = upload_to_cloudinary(profile_picture)
-                log_to_server(f"Uploaded image URL: {cloud_url}")
+                print(f"Uploaded image URL: {cloud_url}")
 
                 user.profile_picture = cloud_url
 

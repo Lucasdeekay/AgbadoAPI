@@ -6,6 +6,8 @@ from django.contrib.auth.models import AbstractUser, PermissionsMixin
 from django.utils import timezone
 
 from rest_framework import serializers
+
+from auth_app.utils import upload_to_cloudinary
 from .models import User, KYC, OTP, Referral
 
 
@@ -18,18 +20,27 @@ class UserSerializer(serializers.ModelSerializer):
         fields = "__all__"
         extra_kwargs = {'password': {'write_only': True}}
 
-    def create(self, validated_data):
-        user = User.objects.create_user(**validated_data)
-        return user
-
     def get_profile_picture(self, obj):
         request = self.context.get('request')
-        if obj.profile_picture and obj.profile_picture.url:
+        if obj.profile_picture and hasattr(obj.profile_picture, 'url'):
             return request.build_absolute_uri(obj.profile_picture.url)
-        return None
+        return obj.profile_picture  # fallback if it's already a URL string
+
+    def create(self, validated_data):
+        image_file = self.context['request'].FILES.get('profile_picture')
+        if image_file:
+            image_url = upload_to_cloudinary(image_file)
+            validated_data['profile_picture'] = image_url
+        return User.objects.create_user(**validated_data)
+
+    def update(self, instance, validated_data):
+        image_file = self.context['request'].FILES.get('profile_picture')
+        if image_file:
+            image_url = upload_to_cloudinary(image_file)
+            validated_data['profile_picture'] = image_url
+        return super().update(instance, validated_data)
 
 
-# Serializer for KYC model
 class KYCSerializer(serializers.ModelSerializer):
     national_id = serializers.SerializerMethodField()
     driver_license = serializers.SerializerMethodField()
@@ -39,23 +50,32 @@ class KYCSerializer(serializers.ModelSerializer):
         model = KYC
         fields = "__all__"
 
+    def _upload_file(self, field_name):
+        file = self.context['request'].FILES.get(field_name)
+        return upload_to_cloudinary(file) if file else None
+
+    def create(self, validated_data):
+        for field in ['national_id', 'driver_license', 'proof_of_address']:
+            url = self._upload_file(field)
+            if url:
+                validated_data[field] = url
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        for field in ['national_id', 'driver_license', 'proof_of_address']:
+            url = self._upload_file(field)
+            if url:
+                validated_data[field] = url
+        return super().update(instance, validated_data)
+
     def get_national_id(self, obj):
-        request = self.context.get('request')
-        if obj.national_id and obj.national_id.url:
-            return request.build_absolute_uri(obj.national_id.url)
-        return None
+        return obj.national_id
 
     def get_driver_license(self, obj):
-        request = self.context.get('request')
-        if obj.driver_license and obj.driver_license.url:
-            return request.build_absolute_uri(obj.driver_license.url)
-        return None
+        return obj.driver_license
 
     def get_proof_of_address(self, obj):
-        request = self.context.get('request')
-        if obj.proof_of_address and obj.proof_of_address.url:
-            return request.build_absolute_uri(obj.proof_of_address.url)
-        return None
+        return obj.proof_of_address
 
 
 class OTPSerializer(serializers.ModelSerializer):
