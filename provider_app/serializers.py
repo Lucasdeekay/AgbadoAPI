@@ -19,19 +19,39 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
     def get_company_logo(self, obj):
         request = self.context.get('request')
         if obj.company_logo and hasattr(obj.company_logo, 'url'):
-            return request.build_absolute_uri(obj.company_logo.url)
-        return obj.company_logo  # fallback if already a URL string
+            # Ensure request is available to build absolute URI
+            if request:
+                return request.build_absolute_uri(obj.company_logo.url)
+            return obj.company_logo.url # Fallback to relative URL if request context is missing
+        return obj.company_logo  # fallback if already a URL string or None
 
     def create(self, validated_data):
-        image_file = self.context['request'].FILES.get('company_logo')
+        image_file = None
+        # Check if 'request' and 'FILES' exist in context before accessing
+        if 'request' in self.context and self.context['request'].FILES:
+            image_file = self.context['request'].FILES.get('company_logo')
+
         if image_file:
             image_url = upload_to_cloudinary(image_file)
             validated_data['company_logo'] = image_url
+            
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        image_file = self.context['request'].FILES.get('company_logo')
+        image_file = None
+        # Check if 'request' and 'FILES' exist in context before accessing
+        if 'request' in self.context and self.context['request'].FILES:
+            image_file = self.context['request'].FILES.get('company_logo')
+
         if image_file:
             image_url = upload_to_cloudinary(image_file)
             validated_data['company_logo'] = image_url
+        # If image_file is None (meaning no new file was provided),
+        # we don't want to accidentally set company_logo to None in validated_data
+        # if it wasn't explicitly sent. So, we'll let super().update handle it
+        # which will only update if the field is present in validated_data.
+        # If you specifically want to allow clients to *clear* the logo by sending
+        # a null or empty string for 'company_logo' in the *regular* data,
+        # you'd handle that separately, but for file uploads, this is standard.
+
         return super().update(instance, validated_data)

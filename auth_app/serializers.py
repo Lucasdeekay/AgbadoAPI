@@ -22,23 +22,52 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_profile_picture(self, obj):
         request = self.context.get('request')
+        # Check if profile_picture is a file and has a URL, then build absolute URI.
+        # Otherwise, return it as is (could be a Cloudinary URL string already saved).
         if obj.profile_picture and hasattr(obj.profile_picture, 'url'):
-            return request.build_absolute_uri(obj.profile_picture.url)
-        return obj.profile_picture  # fallback if it's already a URL string
+            # Ensure request is available to build absolute URI
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url # Fallback to relative URL if request context is missing
+        return obj.profile_picture  # fallback if it's already a URL string or None
 
     def create(self, validated_data):
-        image_file = self.context['request'].FILES.get('profile_picture')
+        # Check if 'profile_picture' was sent in the FILES dictionary before attempting to get it
+        image_file = None
+        if 'request' in self.context and self.context['request'].FILES:
+            image_file = self.context['request'].FILES.get('profile_picture')
+
         if image_file:
             image_url = upload_to_cloudinary(image_file)
             validated_data['profile_picture'] = image_url
-        return User.objects.create_user(**validated_data)
+        
+        # Remove password from validated_data if it's there and create user with create_user
+        password = validated_data.pop('password', None)
+        user = User.objects.create(**validated_data)
+        if password:
+            user.set_password(password)
+            user.save()
+        return user
 
     def update(self, instance, validated_data):
-        image_file = self.context['request'].FILES.get('profile_picture')
+        # Check if 'profile_picture' was sent in the FILES dictionary before attempting to get it
+        image_file = None
+        if 'request' in self.context and self.context['request'].FILES:
+            image_file = self.context['request'].FILES.get('profile_picture')
+
         if image_file:
             image_url = upload_to_cloudinary(image_file)
             validated_data['profile_picture'] = image_url
-        return super().update(instance, validated_data)
+        
+        # Handle password update separately if it's in validated_data
+        password = validated_data.pop('password', None)
+        if password:
+            instance.set_password(password)
+
+        # Update other fields using super().update
+        updated_instance = super().update(instance, validated_data)
+        updated_instance.save() # Save the instance after password set
+        return updated_instance
 
 
 class KYCSerializer(serializers.ModelSerializer):
@@ -51,14 +80,24 @@ class KYCSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def _upload_file(self, field_name):
-        file = self.context['request'].FILES.get(field_name)
-        return upload_to_cloudinary(file) if file else None
+        # Check if the request context and FILES exist before trying to get the file
+        if 'request' in self.context and self.context['request'].FILES:
+            file = self.context['request'].FILES.get(field_name)
+            return upload_to_cloudinary(file) if file else None
+        return None
 
     def create(self, validated_data):
         for field in ['national_id', 'driver_license', 'proof_of_address']:
             url = self._upload_file(field)
             if url:
                 validated_data[field] = url
+            # If no file was uploaded for a field, ensure it's not trying to set None
+            # which might overwrite existing values if that's not the intent.
+            # However, since KYC documents are typically set once, setting None might be okay.
+            # If the intent is *not* to clear a field if no new file is provided,
+            # then remove the `else:` block and only set `validated_data[field]` if `url` is not None.
+            # The current logic will set it to None if `_upload_file` returns None,
+            # which is what `get()` does if the file wasn't present.
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -66,15 +105,40 @@ class KYCSerializer(serializers.ModelSerializer):
             url = self._upload_file(field)
             if url:
                 validated_data[field] = url
+            # If no file was uploaded for a field, it means the client didn't send it.
+            # We should generally *not* update the field if no new file was provided,
+            # to prevent accidentally clearing existing values.
+            # So, only update if `url` is not None, meaning a new file was uploaded.
+            elif field in validated_data and validated_data[field] is None:
+                # This 'elif' case handles if the client explicitly sent 'null' for a field.
+                # If you want to allow clearing a field by explicitly sending null, keep this.
+                # Otherwise, remove it. For file fields, typically you only update if a new file is sent.
+                pass 
+            else:
+                # Remove from validated_data to prevent super().update from setting it to None
+                # if the client didn't send a new file for this field.
+                validated_data.pop(field, None)
         return super().update(instance, validated_data)
 
     def get_national_id(self, obj):
+        # Assuming you want the full URL for display
+        request = self.context.get('request')
+        if obj.national_id and hasattr(obj.national_id, 'url'):
+            return request.build_absolute_uri(obj.national_id.url) if request else obj.national_id.url
         return obj.national_id
 
     def get_driver_license(self, obj):
+        # Assuming you want the full URL for display
+        request = self.context.get('request')
+        if obj.driver_license and hasattr(obj.driver_license, 'url'):
+            return request.build_absolute_uri(obj.driver_license.url) if request else obj.driver_license.url
         return obj.driver_license
 
     def get_proof_of_address(self, obj):
+        # Assuming you want the full URL for display
+        request = self.context.get('request')
+        if obj.proof_of_address and hasattr(obj.proof_of_address, 'url'):
+            return request.build_absolute_uri(obj.proof_of_address.url) if request else obj.proof_of_address.url
         return obj.proof_of_address
 
 

@@ -14,18 +14,39 @@ class ServiceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_image(self, obj):
-        return obj.image if isinstance(obj.image, str) else None
+        request = self.context.get('request')
+        # If obj.image is a FileField, it will have a .url attribute.
+        # If it's already a string (e.g., a Cloudinary URL), return it directly.
+        if obj.image and hasattr(obj.image, 'url'):
+            # Ensure request is available to build absolute URI
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url  # Fallback to relative URL if request context is missing
+        return obj.image # Returns the string URL or None if not set/not a file
 
     def create(self, validated_data):
-        image_file = self.context['request'].FILES.get('image')
+        image_file = None
+        # Safely check if 'request' and 'FILES' exist in context
+        if 'request' in self.context and self.context['request'].FILES:
+            image_file = self.context['request'].FILES.get('image')
+        
         if image_file:
             validated_data['image'] = upload_to_cloudinary(image_file)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        image_file = self.context['request'].FILES.get('image')
+        image_file = None
+        # Safely check if 'request' and 'FILES' exist in context
+        if 'request' in self.context and self.context['request'].FILES:
+            image_file = self.context['request'].FILES.get('image')
+
         if image_file:
+            # Only update the image if a new file is provided
             validated_data['image'] = upload_to_cloudinary(image_file)
+        # Important: If image_file is None, we intentionally *do not* add 'image' to validated_data
+        # unless it was explicitly sent as None in the main request body. This prevents
+        # unintentionally clearing the image if the client simply didn't send a new one.
+        
         return super().update(instance, validated_data)
 
 
@@ -37,52 +58,86 @@ class SubServiceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_image(self, obj):
-        return obj.image if isinstance(obj.image, str) else None
+        request = self.context.get('request')
+        if obj.image and hasattr(obj.image, 'url'):
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return obj.image
 
     def create(self, validated_data):
-        image_file = self.context['request'].FILES.get('image')
+        image_file = None
+        if 'request' in self.context and self.context['request'].FILES:
+            image_file = self.context['request'].FILES.get('image')
+
         if image_file:
             validated_data['image'] = upload_to_cloudinary(image_file)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        image_file = self.context['request'].FILES.get('image')
+        image_file = None
+        if 'request' in self.context and self.context['request'].FILES:
+            image_file = self.context['request'].FILES.get('image')
+
         if image_file:
             validated_data['image'] = upload_to_cloudinary(image_file)
+        
         return super().update(instance, validated_data)
 
 
 class ServiceRequestSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
-    user = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField() # This will now return full user data
 
     class Meta:
         model = ServiceRequest
         fields = '__all__'
 
     def get_image(self, obj):
-        return obj.image if isinstance(obj.image, str) else None
+        request = self.context.get('request')
+        if obj.image and hasattr(obj.image, 'url'):
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return obj.image
 
     def get_user(self, obj):
         request = self.context.get('request')
+        # Ensure profile_picture URL is built correctly, handling None
+        profile_pic_url = None
+        if obj.user.profile_picture and hasattr(obj.user.profile_picture, 'url'):
+            if request:
+                profile_pic_url = request.build_absolute_uri(obj.user.profile_picture.url)
+            else:
+                profile_pic_url = obj.user.profile_picture.url # Fallback to relative URL
+        elif isinstance(obj.user.profile_picture, str): # If it's already a string URL
+            profile_pic_url = obj.user.profile_picture
+
         return {
             "id": obj.user.id,
             "email": obj.user.email,
             "first_name": obj.user.first_name,
             "last_name": obj.user.last_name,
-            "profile_picture": obj.user.profile_picture,
+            "profile_picture": profile_pic_url, # Now includes the full URL
         }
 
     def create(self, validated_data):
-        image_file = self.context['request'].FILES.get('image')
+        image_file = None
+        if 'request' in self.context and self.context['request'].FILES:
+            image_file = self.context['request'].FILES.get('image')
+
         if image_file:
             validated_data['image'] = upload_to_cloudinary(image_file)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        image_file = self.context['request'].FILES.get('image')
+        image_file = None
+        if 'request' in self.context and self.context['request'].FILES:
+            image_file = self.context['request'].FILES.get('image')
+
         if image_file:
             validated_data['image'] = upload_to_cloudinary(image_file)
+        
         return super().update(instance, validated_data)
 
 
