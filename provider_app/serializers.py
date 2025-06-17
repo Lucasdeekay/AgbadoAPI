@@ -17,12 +17,6 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
         )
 
     def get_company_logo(self, obj):
-        request = self.context.get('request')
-        if obj.company_logo and hasattr(obj.company_logo, 'url'):
-            # Ensure request is available to build absolute URI
-            if request:
-                return request.build_absolute_uri(obj.company_logo.url)
-            return obj.company_logo.url # Fallback to relative URL if request context is missing
         return obj.company_logo  # fallback if already a URL string or None
 
     def create(self, validated_data):

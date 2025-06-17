@@ -21,14 +21,6 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
     def get_profile_picture(self, obj):
-        request = self.context.get('request')
-        # Check if profile_picture is a file and has a URL, then build absolute URI.
-        # Otherwise, return it as is (could be a Cloudinary URL string already saved).
-        if obj.profile_picture and hasattr(obj.profile_picture, 'url'):
-            # Ensure request is available to build absolute URI
-            if request:
-                return request.build_absolute_uri(obj.profile_picture.url)
-            return obj.profile_picture.url # Fallback to relative URL if request context is missing
         return obj.profile_picture  # fallback if it's already a URL string or None
 
     def create(self, validated_data):
@@ -121,24 +113,12 @@ class KYCSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
     def get_national_id(self, obj):
-        # Assuming you want the full URL for display
-        request = self.context.get('request')
-        if obj.national_id and hasattr(obj.national_id, 'url'):
-            return request.build_absolute_uri(obj.national_id.url) if request else obj.national_id.url
-        return obj.national_id
+       return obj.national_id
 
     def get_driver_license(self, obj):
-        # Assuming you want the full URL for display
-        request = self.context.get('request')
-        if obj.driver_license and hasattr(obj.driver_license, 'url'):
-            return request.build_absolute_uri(obj.driver_license.url) if request else obj.driver_license.url
         return obj.driver_license
 
     def get_proof_of_address(self, obj):
-        # Assuming you want the full URL for display
-        request = self.context.get('request')
-        if obj.proof_of_address and hasattr(obj.proof_of_address, 'url'):
-            return request.build_absolute_uri(obj.proof_of_address.url) if request else obj.proof_of_address.url
         return obj.proof_of_address
 
 
@@ -163,7 +143,7 @@ class ReferralSerializer(serializers.ModelSerializer):
             "email": obj.user.email,
             "first_name": obj.user.first_name,
             "last_name": obj.user.last_name,
-            "profile_picture": request.build_absolute_uri(obj.user.profile_picture.url) if obj.user.profile_picture and obj.user.profile_picture.url else None,
+            "profile_picture": obj.user.profile_picture,
         }
         return user_data
 
@@ -174,6 +154,6 @@ class ReferralSerializer(serializers.ModelSerializer):
             "email": obj.referer.email,
             "first_name": obj.referer.first_name,
             "last_name": obj.referer.last_name,
-            "profile_picture": request.build_absolute_uri(obj.referer.profile_picture.url) if obj.referer.profile_picture and obj.referer.profile_picture.url else None,
+            "profile_picture": obj.referer.profile_picture,
         }
         return referer_data

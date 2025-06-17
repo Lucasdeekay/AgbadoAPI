@@ -14,14 +14,6 @@ class ServiceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_image(self, obj):
-        request = self.context.get('request')
-        # If obj.image is a FileField, it will have a .url attribute.
-        # If it's already a string (e.g., a Cloudinary URL), return it directly.
-        if obj.image and hasattr(obj.image, 'url'):
-            # Ensure request is available to build absolute URI
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url  # Fallback to relative URL if request context is missing
         return obj.image # Returns the string URL or None if not set/not a file
 
     def create(self, validated_data):
@@ -58,11 +50,6 @@ class SubServiceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_image(self, obj):
-        request = self.context.get('request')
-        if obj.image and hasattr(obj.image, 'url'):
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
         return obj.image
 
     def create(self, validated_data):
@@ -94,11 +81,6 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_image(self, obj):
-        request = self.context.get('request')
-        if obj.image and hasattr(obj.image, 'url'):
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
         return obj.image
 
     def get_user(self, obj):
@@ -168,7 +150,7 @@ class ServiceRequestBidSerializer(serializers.ModelSerializer):
             "user": obj.service_request.user.id, # or serialize the user details similarly
             "title": obj.service_request.title,
             "description": obj.service_request.description,
-            "image": request.build_absolute_uri(obj.service_request.image.url) if obj.service_request.image and obj.service_request.image.url else None,
+            "image": obj.service_request.image,
             "price": str(obj.service_request.price), # Decimal to String
             "category": obj.service_request.category,
             "status": obj.service_request.status,
@@ -193,7 +175,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "email": obj.user.email,
             "first_name": obj.user.first_name,
             "last_name": obj.user.last_name,
-            "profile_picture": request.build_absolute_uri(obj.user.profile_picture.url) if obj.user.profile_picture and obj.user.profile_picture.url else None,
+            "profile_picture": obj.user.profile_picture,
         }
         return user_data
 
@@ -204,6 +186,6 @@ class BookingSerializer(serializers.ModelSerializer):
             "email": obj.service_provider.email,
             "first_name": obj.service_provider.first_name,
             "last_name": obj.service_provider.last_name,
-            "profile_picture": request.build_absolute_uri(obj.service_provider.profile_picture.url) if obj.service_provider.profile_picture and obj.service_provider.profile_picture.url else None,
+            "profile_picture": obj.service_provider.profile_picture,
         }
         return provider_data
