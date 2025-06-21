@@ -96,9 +96,7 @@ class GetKYCDetailsView(APIView):
         try:
 
             kyc_data = KYC.objects.get(user=user)
-            if not kyc_data.exists():
-                return Response({"message": "KYC details not found for this user."}, status=status.HTTP_404_NOT_FOUND)
-
+            
             kyc_data = {
                 "national_id": kyc_data.national_id,
                 "bvn": kyc_data.bvn,
