@@ -50,7 +50,7 @@ class SubServiceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_image(self, obj):
-        return obj.image
+        return obj.image or None  # Returns the string URL or None if not set/not a file
 
     def create(self, validated_data):
         image_file = None
@@ -81,7 +81,7 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_image(self, obj):
-        return obj.image
+        return obj.image or None  # Returns the string URL or None if not set/not a file
 
     def get_user(self, obj):
         request = self.context.get('request')

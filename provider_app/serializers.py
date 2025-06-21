@@ -17,7 +17,7 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
         )
 
     def get_company_logo(self, obj):
-        return obj.company_logo  # fallback if already a URL string or None
+        return obj.company_logo or None  # fallback if already a URL string or None
 
     def create(self, validated_data):
         image_file = None

@@ -21,7 +21,7 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
     def get_profile_picture(self, obj):
-        return obj.profile_picture  # fallback if it's already a URL string or None
+        return obj.profile_picture or None  # fallback if it's already a URL string or None
 
     def create(self, validated_data):
         # Check if 'profile_picture' was sent in the FILES dictionary before attempting to get it
@@ -113,13 +113,13 @@ class KYCSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
     def get_national_id(self, obj):
-       return obj.national_id
+       return obj.national_id or None  # Return None if the field is empty
 
     def get_driver_license(self, obj):
-        return obj.driver_license
+        return obj.driver_license or None  # Return None if the field is empty
 
     def get_proof_of_address(self, obj):
-        return obj.proof_of_address
+        return obj.proof_of_address or None  # Return None if the field is empty
 
 
 class OTPSerializer(serializers.ModelSerializer):
