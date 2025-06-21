@@ -12,6 +12,7 @@ from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 
 from auth_app.models import KYC
+from auth_app.serializers import KYCSerializer
 from auth_app.utils import log_to_server, upload_to_cloudinary, write_to_file
 from auth_app.views import get_user_from_token
 from notification_app.models import Notification
@@ -89,16 +90,17 @@ class GetKYCDetailsView(APIView):
     # permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # Fetch user details
+        user = get_user_from_token(request)
+
         try:
-            # Fetch user details
-            user = get_user_from_token(request)
 
             kyc_data = KYC.objects.filter(user=user)
             if not kyc_data.exists():
                 return Response({"message": "KYC details not found for this user."}, status=status.HTTP_404_NOT_FOUND)
 
             return Response({
-                'kyc_data': kyc_data
+                'kyc_data': KYCSerializer(kyc_data).data,
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
