@@ -102,7 +102,7 @@ class GetKYCDetailsView(APIView):
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
-            return Response({"message": f"Error fetching kyc details"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"Error fetching kyc details: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class UpdateUserProfileView(APIView):
