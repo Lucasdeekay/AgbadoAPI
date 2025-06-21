@@ -82,6 +82,28 @@ class DashboardView(APIView):
 
         return Response(response_data, status=status.HTTP_200_OK)
 
+
+@method_decorator(csrf_exempt, name='dispatch')
+class GetKycDetailsView(APIView):
+    authentication_classes = [TokenAuthentication]
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Fetch user details
+            user = get_user_from_token(request)
+
+            kyc_data = KYC.objects.filter(user=user)
+            if not kyc_data.exists():
+                return Response({"message": "KYC details not found for this user."}, status=status.HTTP_404_NOT_FOUND)
+
+            return Response({
+                'kyc_data': kyc_data
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({"message": f"Error fetching kyc details"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @method_decorator(csrf_exempt, name='dispatch')
 class UpdateUserProfileView(APIView):
     authentication_classes = [TokenAuthentication]
