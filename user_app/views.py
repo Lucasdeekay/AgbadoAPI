@@ -84,7 +84,7 @@ class DashboardView(APIView):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
-class GetKycDetailsView(APIView):
+class GetKYCDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
 
