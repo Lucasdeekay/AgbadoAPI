@@ -99,8 +99,17 @@ class GetKYCDetailsView(APIView):
             if not kyc_data.exists():
                 return Response({"message": "KYC details not found for this user."}, status=status.HTTP_404_NOT_FOUND)
 
+            kyc_data = {
+                "national_id": kyc_data.national_id,
+                "bvn": kyc_data.bvn,
+                "driver_license": kyc_data.driver_license,
+                "proof_of_address": kyc_data.proof_of_address,
+                "status": kyc_data.status,
+                "updated_at": kyc_data.updated_at,
+                "verified_at": kyc_data.verified_at,
+            }
             return Response({
-                'kyc_data': KYCSerializer(kyc_data).data,
+                'kyc_data': kyc_data,
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
@@ -118,7 +127,6 @@ class UpdateUserProfileView(APIView):
         phone_number = request.data.get('phone_number')
         state = request.data.get('state')
         profile_picture = request.FILES.get('profile_picture')
-        print(profile_picture)
 
         # Handle empty requests gracefully
         if not phone_number and not state and not profile_picture:
