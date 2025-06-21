@@ -69,7 +69,10 @@ class KYCSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = KYC
-        fields = "__all__"
+        fields = (
+            'user', 'national_id', 'bvn', 'driver_license', 'proof_of_address',
+            'status', 'updated_at', 'verified_at'
+        )
 
     def _upload_file(self, field_name):
         # Check if the request context and FILES exist before trying to get the file
