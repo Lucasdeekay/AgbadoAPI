@@ -63,9 +63,9 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class KYCSerializer(serializers.ModelSerializer):
-    national_id = serializers.SerializerMethodField()
-    driver_license = serializers.SerializerMethodField()
-    proof_of_address = serializers.SerializerMethodField()
+    # These should NOT be SerializerMethodField if you want to write to them.
+    # They should correspond to the model fields directly.
+    # We will handle the file upload logic in create/update.
 
     class Meta:
         model = KYC
@@ -73,57 +73,96 @@ class KYCSerializer(serializers.ModelSerializer):
             'user', 'national_id', 'bvn', 'driver_license', 'proof_of_address',
             'status', 'updated_at', 'verified_at'
         )
+        # Add extra_kwargs if you want to make these fields explicitly write_only
+        # which is common for file uploads where the client sends a file,
+        # but the API returns a URL.
+        extra_kwargs = {
+            'national_id': {'write_only': True, 'required': False},
+            'driver_license': {'write_only': True, 'required': False},
+            'proof_of_address': {'write_only': True, 'required': False},
+        }
 
-    def _upload_file(self, field_name):
-        # Check if the request context and FILES exist before trying to get the file
-        if 'request' in self.context and self.context['request'].FILES:
-            file = self.context['request'].FILES.get(field_name)
-            return upload_to_cloudinary(file) if file else None
-        return None
+    # Helper method to get the file and upload
+    def _handle_file_upload(self, field_name, validated_data):
+        request = self.context.get('request')
+        if request and request.FILES:
+            file = request.FILES.get(field_name)
+            if file:
+                # If a file is provided, upload it and update validated_data
+                url = upload_to_cloudinary(file)
+                if url:
+                    validated_data[field_name] = url
+                # If upload fails, you might want to raise a validation error
+                # else:
+                #    raise serializers.ValidationError({field_name: "File upload failed."})
+            elif field_name in request.data:
+                # This handles cases where the client sends field_name=null to explicitly clear it
+                # Only if you want to allow clearing files this way
+                if request.data.get(field_name) is None:
+                    validated_data[field_name] = None
+                # If field_name is present in request.data but not in request.FILES, and not null,
+                # it means the client might have sent a URL directly. This is generally not
+                # recommended for upload fields, but if allowed, add logic here.
+        # If no file is provided, and the field is not in request.data (i.e., not explicitly cleared),
+        # we do nothing, letting the existing value persist for updates.
 
     def create(self, validated_data):
-        for field in ['national_id', 'driver_license', 'proof_of_address']:
-            url = self._upload_file(field)
-            if url:
-                validated_data[field] = url
-            # If no file was uploaded for a field, ensure it's not trying to set None
-            # which might overwrite existing values if that's not the intent.
-            # However, since KYC documents are typically set once, setting None might be okay.
-            # If the intent is *not* to clear a field if no new file is provided,
-            # then remove the `else:` block and only set `validated_data[field]` if `url` is not None.
-            # The current logic will set it to None if `_upload_file` returns None,
-            # which is what `get()` does if the file wasn't present.
+        # Handle file uploads *before* calling super().create
+        self._handle_file_upload('national_id', validated_data)
+        self._handle_file_upload('driver_license', validated_data)
+        self._handle_file_upload('proof_of_address', validated_data)
+
+        # The 'bvn' field should be present in validated_data if sent by the client.
+        # Since it's a regular ModelSerializer field, DRF handles its validation and inclusion automatically.
+
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        # Handle file uploads *before* calling super().update
+        # Note: If a file is NOT provided in the update request, we do *not*
+        # want to overwrite the existing instance's URL with None.
+        # So, we remove it from validated_data if no new file was uploaded.
+
         for field in ['national_id', 'driver_license', 'proof_of_address']:
-            url = self._upload_file(field)
-            if url:
-                validated_data[field] = url
-            # If no file was uploaded for a field, it means the client didn't send it.
-            # We should generally *not* update the field if no new file was provided,
-            # to prevent accidentally clearing existing values.
-            # So, only update if `url` is not None, meaning a new file was uploaded.
+            request = self.context.get('request')
+            if request and request.FILES and request.FILES.get(field):
+                # Only process if a new file is actually provided
+                file = request.FILES.get(field)
+                url = upload_to_cloudinary(file)
+                if url:
+                    validated_data[field] = url
+                else:
+                    # If upload failed for a new file, remove it from validated_data
+                    validated_data.pop(field, None)
+                    # Optionally, raise an error here if upload is mandatory
             elif field in validated_data and validated_data[field] is None:
-                # This 'elif' case handles if the client explicitly sent 'null' for a field.
-                # If you want to allow clearing a field by explicitly sending null, keep this.
-                # Otherwise, remove it. For file fields, typically you only update if a new file is sent.
-                pass 
+                # This handles explicit clearing by sending field: null in the JSON body
+                # If you don't want to allow clearing via JSON null, remove this block.
+                pass # validated_data[field] is already None, no action needed for update to clear it.
             else:
-                # Remove from validated_data to prevent super().update from setting it to None
-                # if the client didn't send a new file for this field.
+                # If the field was not provided in FILES and not explicitly sent as null in JSON,
+                # we don't want to update it. Remove it from validated_data to prevent clearing.
                 validated_data.pop(field, None)
+
+        # The 'bvn' field should be handled automatically by ModelSerializer
+        # unless it's explicitly popped or manipulated.
+
         return super().update(instance, validated_data)
 
+    # These get_ methods are for outputting the URLs when serializing (reading).
+    # If your model fields already store the URLs, you don't strictly need these
+    # unless you want to format them differently or handle cases where they might be empty.
+    # If the model fields store files directly (e.g., ImageField), then these are needed
+    # to convert the file path to a full URL. Assuming they store URLs directly here.
     def get_national_id(self, obj):
-       return obj.national_id or None  # Return None if the field is empty
+        # Assuming obj.national_id is already the URL or None
+        return obj.national_id if obj.national_id else None
 
     def get_driver_license(self, obj):
-        return obj.driver_license or None  # Return None if the field is empty
+        return obj.driver_license if obj.driver_license else None
 
     def get_proof_of_address(self, obj):
-        return obj.proof_of_address or None  # Return None if the field is empty
-
+        return obj.proof_of_address if obj.proof_of_address else None
 
 class OTPSerializer(serializers.ModelSerializer):
     class Meta:
