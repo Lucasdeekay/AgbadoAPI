@@ -177,8 +177,6 @@ class UpdateKYCView(APIView):
     def post(self, request):
         user = get_user_from_token(request)
 
-        log_to_server(f"Received request data for KYC update: {request.data}")
-
         # 1. Get or create the KYC instance correctly
         # get_or_create returns a tuple: (object, created_boolean)
         kyc_instance, created = KYC.objects.get_or_create(user=user)
