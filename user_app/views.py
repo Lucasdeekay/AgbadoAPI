@@ -172,66 +172,60 @@ class UpdateUserProfileView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class UpdateKYCView(APIView):
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated] # Uncomment and set this up as needed
 
     def post(self, request):
         user = get_user_from_token(request)
 
-        # Retrieve the user's KYC record
-        try:
-            kyc = KYC.objects.get_or_create(user=user)
-        except ObjectDoesNotExist:
-            return Response(
-                {"message": "KYC record not found for this user."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # 1. Get or create the KYC instance correctly
+        # get_or_create returns a tuple: (object, created_boolean)
+        kyc_instance, created = KYC.objects.get_or_create(user=user)
 
-        # Extract data from the request
-        national_id = request.FILES.get('national_id')
-        bvn = request.data.get('bvn')
-        driver_license = request.FILES.get('driver_license')
-        proof_of_address = request.FILES.get('proof_of_address')
+        # 2. Instantiate the serializer with the instance and request data
+        # Pass request context to serializer for file handling
+        serializer = KYCSerializer(
+            kyc_instance,  # The existing KYC instance to update
+            data=request.data,
+            partial=True,  # Allow partial updates (don't require all fields)
+            context={'request': request} # Crucial for serializer's file handling
+        )
 
-        # Handle empty requests gracefully
-        if not any([national_id, bvn, driver_license, proof_of_address]):
-            return Response(
-                {"message": "No data provided to update KYC."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # 3. Validate the data
+        if serializer.is_valid():
+            try:
+                # 4. Save the serializer. This will call the serializer's .update() method.
+                serializer.save()
 
-        try:
-            # Update fields if they are provided
-            if bvn:
-                kyc.bvn = bvn
-            if national_id:
-                kyc.national_id = upload_to_cloudinary(national_id)
-            if driver_license:
-                kyc.driver_license = upload_to_cloudinary(driver_license)
-            if proof_of_address:
-                kyc.proof_of_address = upload_to_cloudinary(proof_of_address)
+                # 5. Update KYC status and timestamp *after* serializer save, if needed
+                # The serializer's update method should handle most field updates.
+                # If 'status' and 'updated_at' are always set in the view logic, keep this.
+                # Otherwise, consider moving `kyc.status = 'Pending'` etc. into the serializer's `update` method.
+                if kyc_instance.status != 'Pending': # Only update if status needs changing
+                     kyc_instance.status = 'Pending'
+                     kyc_instance.updated_at = timezone.now()
+                     kyc_instance.save(update_fields=['status', 'updated_at']) # Save specific fields
 
+                # Create notification (keep this in the view as it's a side effect)
+                Notification.objects.create(
+                    user=user,
+                    title="KYC Updated",
+                    message="Your KYC details have been updated and are pending review."
+                )
 
-            kyc.status = 'Pending'  # Reset status to 'Pending' after update
-            kyc.updated_at = timezone.now()
+                return Response(
+                    {"message": "KYC details updated successfully.", "kyc_data": serializer.data},
+                    status=status.HTTP_200_OK
+                )
+            except Exception as e:
+                # Catch any unexpected errors during serializer.save() or subsequent logic
+                return Response(
+                    {"message": f"An internal server error occurred: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        else:
+            # 6. Return validation errors if data is not valid
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            kyc.save()
-
-            Notification.objects.create(
-                user=user,
-                title="KYC Updated",
-                message="Your KYC details have been updated and are pending review."
-            )
-
-            return Response(
-                {"message": "KYC details updated successfully."},
-                status=status.HTTP_200_OK
-            )
-
-        except Exception as e:
-            return Response(
-                {"message": f"An error occurred: {request.data}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ChangePasswordView(APIView):
