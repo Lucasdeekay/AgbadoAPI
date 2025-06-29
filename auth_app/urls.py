@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from .views import CompleteWebAuthnAuthenticationView, CompleteWebAuthnRegistrationView, DeleteWebAuthnCredentialView, ListWebAuthnCredentialsView, RegisterServiceProviderView, LoginView, LogoutView, ForgotPasswordView, RegisterUserView, ResetPasswordView, SendOTPView, StartWebAuthnAuthenticationView, StartWebAuthnRegistrationView, UpdateIsBusyView, VerifyOTPView, \
+from .views import CompleteWebAuthnAuthenticationView, CompleteWebAuthnRegistrationView, DeleteAccountView, DeleteWebAuthnCredentialView, ListWebAuthnCredentialsView, RegisterServiceProviderView, LoginView, LogoutView, ForgotPasswordView, RegisterUserView, ResetPasswordView, SendOTPView, StartWebAuthnAuthenticationView, StartWebAuthnRegistrationView, UpdateIsBusyView, VerifyOTPView, \
     GoogleAppleAuthView
 from .viewsets import UserViewSet, KYCViewSet, OTPViewSet, ReferralViewSet
 
@@ -19,6 +19,7 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
+    path('delete-account/', DeleteAccountView.as_view(), name='delete-account'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('update-status/', UpdateIsBusyView.as_view(), name='update-status'),
     path('login/google-or-apple/', GoogleAppleAuthView.as_view(), name='google-or-apple-auth'),

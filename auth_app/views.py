@@ -35,8 +35,12 @@ from webauthn.helpers.structs import (
 from agbado import settings
 from notification_app.models import Notification
 from .serializers import UserSerializer
-from .models import User as CustomUser, OTP, Referral
+from .models import User as CustomUser, OTP, Referral, WebAuthnCredential
 from .utils import create_otp, send_otp_email, send_otp_sms, write_to_file
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_user_from_token(request):
@@ -598,8 +602,8 @@ class StartWebAuthnAuthenticationView(APIView):
             return Response({"message": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
             return Response({"message": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # Get all registered credentials for this user
@@ -648,8 +652,8 @@ class CompleteWebAuthnAuthenticationView(APIView):
             return Response({"message": "Invalid or expired authentication challenge."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user = User.objects.get(id=int(stored_user_id_for_webauthn_auth))
-        except User.DoesNotExist:
+            user = CustomUser.objects.get(id=int(stored_user_id_for_webauthn_auth))
+        except CustomUser.DoesNotExist:
             return Response({"message": "User not found for authentication."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
@@ -744,3 +748,38 @@ class ListWebAuthnCredentialsView(APIView):
             } for cred in credentials
         ]
         return Response({"credentials": data}, status=status.HTTP_200_OK)
+
+# New view for deleting a user account
+@method_decorator(csrf_exempt, name='dispatch')
+class DeleteAccountView(APIView):
+    authentication_classes = [TokenAuthentication]
+    # permission_classes = [IsAuthenticated]1
+
+    def delete(self, request):
+        """
+        Deletes the authenticated user's account.
+        """
+        user = get_user_from_token(request)
+
+        # Optional: Add a confirmation step (e.g., require password re-entry)
+        # For security, consider making this a POST request that takes the password
+        # for re-authentication before actually deleting. For this example,
+        # we'll assume the token authentication is sufficient for DELETE.
+
+        try:
+            user_email = user.email # Store for logging before deletion
+            user.delete() # Django's built-in delete method for model instances
+
+            logger.info(f"User account {user_email} deleted successfully.")
+
+            # After deleting the user, ensure their token is also gone (Django's delete handles this for OneToOneField)
+            # and log them out from the session.
+            logout(request)
+
+            return Response({"message": "Account deleted successfully."}, status=status.HTTP_204_NO_CONTENT) # 204 No Content for successful deletion
+
+        except Exception as e:
+            logger.error(f"Error deleting account for user {user.email if user else 'unknown'}: {e}")
+            return Response({
+                "message": f"An unexpected error occurred while deleting the account: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
