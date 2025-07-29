@@ -1,17 +1,18 @@
 from rest_framework import serializers, viewsets, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.decorators import action # For custom actions
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction as db_transaction # Avoid name clash with model
 
-from .models import Wallet, Transaction, Withdrawal
+from .models import Wallet, Transaction, Withdrawal, Bank
 from .serializers import (
     WalletSerializer,
     TransactionSerializer,
     WithdrawalRequestSerializer, # For creating withdrawals
     WithdrawalDetailSerializer,   # For viewing withdrawal details
+    BankSerializer,
 )
 from .filters import ( # We'll create these filters below
     WalletFilter,
@@ -455,3 +456,69 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
             # ... add more as needed
         }
         return bank_codes.get(bank_name.lower(), None) # Convert to lowercase for matching
+    
+
+class BankViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Bank.objects.filter(is_active=True) # Only show active banks
+    serializer_class = BankSerializer
+    permission_classes = [AllowAny] # Banks can be listed by anyone to choose from
+    pagination_class = CustomPagination # Optional pagination
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminUser])
+    def fetch_from_paystack(self, request):
+        """
+        Custom action to fetch and update the list of banks from Paystack.
+        Requires admin privileges.
+        """
+        headers = {
+            'Authorization': f'Bearer {settings.PAYSTACK_SECRET_KEY}',
+            'Content-Type': 'application/json'
+        }
+        try:
+            response = requests.get(f"{settings.PAYSTACK_API_BASE_URL}/bank", headers=headers)
+            response.raise_for_status()
+            bank_data = response.json()
+
+            if bank_data.get('status'):
+                fetched_banks = bank_data['data']
+                updated_count = 0
+                created_count = 0
+
+                for bank_info in fetched_banks:
+                    bank_obj, created = Bank.objects.update_or_create(
+                        code=bank_info['code'], # Use code as unique identifier for update_or_create
+                        defaults={
+                            'name': bank_info['name'],
+                            'slug': bank_info['slug'],
+                            'is_active': True # Assume all fetched banks are active
+                        }
+                    )
+                    if created:
+                        created_count += 1
+                    else:
+                        updated_count += 1
+                
+                # Deactivate any banks that are no longer returned by Paystack
+                # Get current codes from Paystack
+                paystack_codes = {bank['code'] for bank in fetched_banks}
+                # Get codes currently in your DB that are active
+                db_active_codes = set(Bank.objects.filter(is_active=True).values_list('code', flat=True))
+
+                # Find banks in DB that are active but not in Paystack's list
+                to_deactivate_codes = db_active_codes - paystack_codes
+                deactivated_count = Bank.objects.filter(code__in=to_deactivate_codes).update(is_active=False)
+
+                return Response({
+                    "message": "Banks list updated successfully.",
+                    "created": created_count,
+                    "updated": updated_count,
+                    "deactivated": deactivated_count
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({"message": bank_data.get('message', 'Failed to fetch banks from Paystack.')}, status=status.HTTP_400_BAD_REQUEST)
+
+        except requests.exceptions.RequestException as e:
+            return Response({"message": f"Error connecting to Paystack bank API: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"message": f"An unexpected error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

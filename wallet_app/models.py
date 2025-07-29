@@ -111,6 +111,21 @@ class Withdrawal(models.Model):
         ordering = ['-created_at'] # Order by most recent withdrawals first
 
 
+class Bank(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=10, unique=True)
+    slug = models.CharField(max_length=100, unique=True, null=True, blank=True) # Paystack slug
+    is_active = models.BooleanField(default=True)
+    added_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+    class Meta:
+        ordering = ['name']
+
+
 # Signal to create a Wallet for every new User
 @receiver(post_save, sender=User)
 def create_user_wallet(sender, instance, created, **kwargs):
@@ -127,3 +142,4 @@ def save_user_wallet(sender, instance, **kwargs):
         # or if the wallet was manually deleted.
         # Consider creating it here as a fallback or logging an error.
         Wallet.objects.create(user=instance)
+

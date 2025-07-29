@@ -1,4 +1,6 @@
 from decimal import Decimal
+import hmac
+import hashlib
 import os
 import requests
 import json # Import json for Paystack response parsing
@@ -10,11 +12,14 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from django.db import transaction as db_transaction
+from django.http import HttpResponse
 from django.utils import timezone # For precise timestamps
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 
 from auth_app.views import get_user_from_token # Assuming this correctly fetches user from token
 from notification_app.models import Notification
-from wallet_app.models import Wallet, Transaction, Withdrawal
+from wallet_app.models import Wallet, Transaction, Withdrawal, Bank
 from wallet_app.serializers import (
     WalletSerializer, # Use WalletSerializer for full wallet details
     TransactionSerializer,
@@ -30,27 +35,26 @@ PAYSTACK_API_BASE_URL = "https://api.paystack.co"
 # Helper function to get bank code (ideally from a cached DB table or Paystack's /bank API)
 def _get_bank_code(bank_name):
     """
-    Helper to map bank name to Paystack bank code.
-    In a real application, you'd fetch this dynamically from Paystack's /bank endpoint
-    and cache it, or maintain a secure list in your database.
+    Retrieves the bank code from the local database.
+    Assumes the Bank model is populated via the fetch_from_paystack endpoint.
     """
-    bank_codes = {
-        'wema bank': '035',
-        'zenith bank': '057',
-        'guaranty trust bank': '058',
-        'access bank': '044',
-        'first bank of nigeria': '011',
-        'union bank of nigeria': '032',
-        'fidelity bank': '070',
-        'united bank for africa': '033',
-        'stanbic ibtc bank': '221',
-        'sterling bank': '232',
-        'gtbank': '058', # Common alias
-        'access': '044',
-        'fbn': '011',
-        # ... add more common banks and their codes
-    }
-    return bank_codes.get(bank_name.lower(), None) # Convert to lowercase for matching
+    try:
+        # Try to find by exact name or slug
+        bank = Bank.objects.get(Q(name__iexact=bank_name) | Q(slug__iexact=bank_name), is_active=True)
+        return bank.code
+    except Bank.DoesNotExist:
+        # Fallback to crude match for common variations if needed, or raise error
+        # It's better to guide the user to select from a list
+        print(f"Bank '{bank_name}' not found in local database or not active.")
+        # You might still have a small, hardcoded fallback for well-known banks
+        # if your list isn't always fresh, but rely on DB first.
+        bank_codes_fallback = {
+            'wema bank': '035', 'zenith bank': '057', 'gtbank': '058', # etc.
+        }
+        return bank_codes_fallback.get(bank_name.lower(), None)
+    except Exception as e:
+        print(f"Error getting bank code for {bank_name}: {e}")
+        return None
 
 
 # 1. View to return wallet details and last 5 transactions
@@ -394,3 +398,305 @@ class WithdrawalRequestView(APIView):
             raise requests.exceptions.RequestException(f"Paystack Transfer Initiation API error: {e}")
         except Exception as e:
             raise Exception(f"Error initiating Paystack transfer: {e}")
+        
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class PaystackWebhookView(APIView):
+    authentication_classes = [] # No authentication for webhooks
+    permission_classes = []     # No permissions for webhooks
+
+    def post(self, request, *args, **kwargs):
+        # 1. Verify Webhook Signature
+        paystack_signature = request.headers.get('x-paystack-signature')
+        if not paystack_signature:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST, content="No X-Paystack-Signature header.")
+
+        # Get raw request body (important for signature verification)
+        raw_payload = request.body.decode('utf-8')
+
+        # Hash the payload with your secret key
+        digest = hmac.new(
+            PAYSTACK_SECRET_KEY.encode('utf-8'),
+            raw_payload.encode('utf-8'),
+            hashlib.sha512
+        ).hexdigest()
+
+        if digest != paystack_signature:
+            print("Webhook signature mismatch. Potential tampering detected.")
+            return HttpResponse(status=status.HTTP_403_FORBIDDEN, content="Invalid webhook signature.")
+
+        # 2. Parse the Event Data
+        try:
+            event = json.loads(raw_payload)
+        except json.JSONDecodeError:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST, content="Invalid JSON payload.")
+
+        event_type = event.get('event')
+        event_data = event.get('data')
+
+        if not event_type or not event_data:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST, content="Invalid event data structure.")
+
+        # Paystack expects a 200 OK response quickly, even if processing takes time.
+        # For complex logic, you'd send 200 OK immediately and offload processing to a task queue.
+        # For this example, we'll process synchronously.
+        try:
+            if event_type == 'charge.success':
+                self._handle_charge_success(event_data)
+            elif event_type == 'transfer.success':
+                self._handle_transfer_success(event_data)
+            elif event_type == 'transfer.failed':
+                self._handle_transfer_failed(event_data)
+            elif event_type == 'transfer.reversed':
+                self._handle_transfer_reversed(event_data)
+            # Add other event types if necessary (e.g., invoice.create, subscription.update)
+            else:
+                print(f"Unhandled Paystack event type: {event_type}")
+
+            return HttpResponse(status=status.HTTP_200_OK) # Acknowledge receipt
+        except Exception as e:
+            # Log the error, but still return 200 to Paystack to prevent retries
+            # For debugging, you might temporarily return 500, but in production, 200 is safer.
+            print(f"Error processing Paystack webhook event {event_type}: {e}")
+            return HttpResponse(status=status.HTTP_200_OK) # Still return 200 to Paystack
+
+
+    def _handle_charge_success(self, data):
+        """
+        Handles successful deposit events (e.g., from Dedicated Virtual Accounts).
+        """
+        reference = data.get('reference')
+        amount_kobo = data.get('amount') # Amount in kobo/pesewas
+        status = data.get('status')
+        customer_email = data.get('customer', {}).get('email')
+        paystack_transaction_id = data.get('id')
+        paid_at = data.get('paid_at') # Payment timestamp
+
+        if status != 'success':
+            print(f"Charge not successful for reference {reference}, status: {status}")
+            return
+
+        amount = Decimal(amount_kobo) / 100 # Convert kobo to your currency unit
+
+        with db_transaction.atomic():
+            # Check for idempotency: Has this transaction already been processed?
+            if Transaction.objects.filter(reference=reference, status='Completed').exists():
+                print(f"Deposit with reference {reference} already processed. Skipping.")
+                return
+
+            try:
+                # Find user by email (or by customer_code if stored on User model directly)
+                user = User.objects.get(email=customer_email)
+                wallet = Wallet.objects.select_for_update().get(user=user)
+
+                wallet.balance += amount
+                wallet.save(update_fields=['balance'])
+
+                transaction, created = Transaction.objects.get_or_create(
+                    reference=reference, # Use reference for uniqueness
+                    defaults={
+                        'user': user,
+                        'transaction_type': 'Deposit',
+                        'amount': amount,
+                        'status': 'Completed',
+                        'paystack_transaction_id': paystack_transaction_id,
+                        'created_at': timezone.datetime.fromisoformat(paid_at.replace('Z', '+00:00')) if paid_at else timezone.now(),
+                    }
+                )
+                if not created:
+                    # If transaction already existed but wasn't 'Completed' (e.g., failed retry)
+                    transaction.status = 'Completed'
+                    transaction.paystack_transaction_id = paystack_transaction_id
+                    transaction.save(update_fields=['status', 'paystack_transaction_id'])
+
+                Notification.objects.create(
+                    user=user,
+                    title="Deposit Successful",
+                    message=f"A deposit of {amount} has been successfully added to your wallet. Ref: {reference}"
+                )
+                print(f"Successfully processed deposit for {user.email}, amount {amount}, ref {reference}")
+
+            except User.DoesNotExist:
+                print(f"User not found for email: {customer_email}. Cannot process deposit {reference}.")
+                # Handle this: maybe create a user? Log a critical error?
+            except Wallet.DoesNotExist:
+                print(f"Wallet not found for user: {customer_email}. Cannot process deposit {reference}.")
+                # This should ideally not happen if you create wallets with users
+            except Exception as e:
+                print(f"Error handling charge.success for {reference}: {e}")
+                raise # Re-raise to ensure transaction rollback if within atomic block
+
+    def _handle_transfer_success(self, data):
+        """
+        Handles successful withdrawal (transfer) events.
+        """
+        reference = data.get('reference')
+        amount_kobo = data.get('amount')
+        paystack_transfer_id = data.get('id')
+
+        amount = Decimal(amount_kobo) / 100
+
+        with db_transaction.atomic():
+            try:
+                # Find the corresponding Withdrawal request
+                withdrawal = Withdrawal.objects.select_for_update().get(
+                    paystack_transfer_reference=reference
+                )
+
+                if withdrawal.status == 'Completed':
+                    print(f"Withdrawal {reference} already marked as completed. Skipping.")
+                    return
+
+                withdrawal.status = 'Completed'
+                withdrawal.updated_at = timezone.now()
+                withdrawal.save(update_fields=['status', 'updated_at'])
+
+                # Update the corresponding Transaction
+                transaction = Transaction.objects.get(
+                    user=withdrawal.user,
+                    transaction_type='Withdrawal',
+                    reference=reference # Match by the same reference
+                )
+                transaction.status = 'Completed'
+                transaction.updated_at = timezone.now()
+                transaction.save(update_fields=['status', 'updated_at'])
+
+                Notification.objects.create(
+                    user=withdrawal.user,
+                    title="Withdrawal Completed",
+                    message=f"Your withdrawal of {amount} has been successfully processed."
+                )
+                print(f"Successfully processed successful transfer for {reference}")
+
+            except Withdrawal.DoesNotExist:
+                print(f"Withdrawal request with reference {reference} not found. Could not update status.")
+            except Transaction.DoesNotExist:
+                print(f"Transaction for withdrawal {reference} not found. Data inconsistency.")
+            except Exception as e:
+                print(f"Error handling transfer.success for {reference}: {e}")
+                raise
+
+    def _handle_transfer_failed(self, data):
+        """
+        Handles failed withdrawal (transfer) events. Funds are NOT returned by Paystack.
+        This means the funds were deducted from your Paystack balance but didn't reach the recipient.
+        You might need to manually reconcile or contact Paystack support.
+        From a user's wallet perspective, their balance was already reduced, and it should remain so.
+        """
+        reference = data.get('reference')
+        fail_reason = data.get('transfer_code_reason') or data.get('status') or 'Unknown reason'
+        amount_kobo = data.get('amount')
+        
+        amount = Decimal(amount_kobo) / 100
+
+        with db_transaction.atomic():
+            try:
+                withdrawal = Withdrawal.objects.select_for_update().get(
+                    paystack_transfer_reference=reference
+                )
+
+                if withdrawal.status == 'Failed':
+                    print(f"Withdrawal {reference} already marked as failed. Skipping.")
+                    return
+
+                withdrawal.status = 'Failed'
+                withdrawal.failure_reason = f"Paystack transfer failed: {fail_reason}"
+                withdrawal.updated_at = timezone.now()
+                withdrawal.save(update_fields=['status', 'failure_reason', 'updated_at'])
+
+                transaction = Transaction.objects.get(
+                    user=withdrawal.user,
+                    transaction_type='Withdrawal',
+                    reference=reference
+                )
+                transaction.status = 'Failed'
+                transaction.updated_at = timezone.now()
+                transaction.save(update_fields=['status', 'updated_at'])
+
+                Notification.objects.create(
+                    user=withdrawal.user,
+                    title="Withdrawal Failed",
+                    message=f"Your withdrawal of {amount} failed. Reason: {fail_reason}. Please contact support."
+                )
+                print(f"Processed failed transfer for {reference}, reason: {fail_reason}")
+
+            except Withdrawal.DoesNotExist:
+                print(f"Withdrawal request with reference {reference} not found for failed event.")
+            except Transaction.DoesNotExist:
+                print(f"Transaction for failed withdrawal {reference} not found. Data inconsistency.")
+            except Exception as e:
+                print(f"Error handling transfer.failed for {reference}: {e}")
+                raise
+
+    def _handle_transfer_reversed(self, data):
+        """
+        Handles reversed withdrawal (transfer) events.
+        This means the funds were reversed back to YOUR Paystack balance.
+        Crucially, you MUST credit the user's wallet back.
+        """
+        reference = data.get('reference')
+        amount_kobo = data.get('amount')
+        reverse_reason = data.get('message') or 'Unknown reason'
+
+        amount = Decimal(amount_kobo) / 100
+
+        with db_transaction.atomic():
+            try:
+                withdrawal = Withdrawal.objects.select_for_update().get(
+                    paystack_transfer_reference=reference
+                )
+
+                if withdrawal.status == 'Reversed':
+                    print(f"Withdrawal {reference} already marked as reversed. Skipping.")
+                    return
+
+                # Update Withdrawal status
+                withdrawal.status = 'Reversed'
+                withdrawal.failure_reason = f"Paystack transfer reversed: {reverse_reason}"
+                withdrawal.updated_at = timezone.now()
+                withdrawal.save(update_fields=['status', 'failure_reason', 'updated_at'])
+
+                # Credit user's wallet back
+                user_wallet = Wallet.objects.select_for_update().get(user=withdrawal.user)
+                user_wallet.balance += amount
+                user_wallet.save(update_fields=['balance'])
+                print(f"Credited wallet of {user_wallet.user.email} with {amount} due to reversed transfer {reference}.")
+
+                # Update the corresponding Transaction
+                transaction = Transaction.objects.get(
+                    user=withdrawal.user,
+                    transaction_type='Withdrawal',
+                    reference=reference
+                )
+                transaction.status = 'Reversed'
+                transaction.updated_at = timezone.now()
+                transaction.save(update_fields=['status', 'updated_at'])
+
+                # Create a new deposit transaction to clearly show funds return
+                Transaction.objects.create(
+                    user=withdrawal.user,
+                    transaction_type='Deposit',
+                    amount=amount,
+                    status='Completed',
+                    reference=f"REVERSED-DEPOSIT-{reference}", # New unique ref for the return
+                    # Link to original withdrawal if needed
+                )
+
+                Notification.objects.create(
+                    user=withdrawal.user,
+                    title="Withdrawal Reversed & Funds Returned",
+                    message=f"Your withdrawal of {amount} was reversed. The funds have been returned to your wallet. Reason: {reverse_reason}"
+                )
+                print(f"Processed reversed transfer for {reference}, reason: {reverse_reason}. Funds returned to wallet.")
+
+            except Withdrawal.DoesNotExist:
+                print(f"Withdrawal request with reference {reference} not found for reversed event.")
+            except Transaction.DoesNotExist:
+                print(f"Transaction for reversed withdrawal {reference} not found. Data inconsistency.")
+            except Wallet.DoesNotExist:
+                print(f"Wallet for user {withdrawal.user.email} not found for reversed transfer {reference}. Critical error.")
+            except Exception as e:
+                print(f"Error handling transfer.reversed for {reference}: {e}")
+                raise
+

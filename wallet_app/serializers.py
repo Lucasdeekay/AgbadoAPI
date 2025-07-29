@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Wallet, Transaction, Withdrawal
+from .models import Wallet, Transaction, Withdrawal, Bank
 from auth_app.models import User # Assuming User model is here for nested serializer
 
 
@@ -136,3 +136,9 @@ class WithdrawalDetailSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
+
+class BankSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Bank
+        fields = ['id', 'name', 'code', 'slug']
+        read_only_fields = ['id', 'name', 'code', 'slug']
