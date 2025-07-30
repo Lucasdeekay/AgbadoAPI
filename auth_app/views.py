@@ -34,6 +34,7 @@ from webauthn.helpers.structs import (
 
 from agbado import settings
 from notification_app.models import Notification
+from user_app.models import UserReward
 from .serializers import UserSerializer
 from .models import User as CustomUser, OTP, Referral, WebAuthnCredential
 from .utils import create_otp, send_otp_email, send_otp_sms, write_to_file
@@ -41,6 +42,9 @@ import logging
 
 
 logger = logging.getLogger(__name__)
+
+# Reward for referring a user (subject to change)
+REFERRAL_REWARD = 50
 
 
 def get_user_from_token(request):
@@ -165,6 +169,9 @@ class RegisterUserView(APIView):
         if CustomUser.objects.filter(referral_code=referral_code).exists():
             referer = CustomUser.objects.get(referral_code=referral_code)
             Referral.objects.create(user=user, referer=referer)
+            user_reward = UserReward.objects.get_or_create(user=referer)
+            user_reward.points += REFERRAL_REWARD # Subject to change
+            user_reward.save()
 
         user_data = {
             'first_name': first_name,
