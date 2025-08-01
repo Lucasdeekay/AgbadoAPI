@@ -50,24 +50,24 @@ urlpatterns = [
     # It's better to use the ViewSet's custom action for wallet details,
     # as it also handles DVA creation logic.
     # So, we can remove the root path unless you have a strong reason for it.
-    # path('', WalletDetailsView.as_view(), name='wallet-details'), # Consider removing this if /api/wallets/my-wallet/ is preferred
+    path('', WalletDetailsView.as_view(), name='wallet-details'), # Consider removing this if /api/wallets/my-wallet/ is preferred
 
     # 2. All Transactions:
     # TransactionViewSet provides /api/transactions/ for listing all transactions
     # (filtered by user due to get_queryset() in the ViewSet).
     # So, AllTransactionsView is redundant.
-    # path('transactions/', AllTransactionsView.as_view(), name='all-transactions'), # REMOVE THIS
+    path('transactions/', AllTransactionsView.as_view(), name='all-transactions'), # REMOVE THIS
 
     # 3. Transaction Detail:
     # TransactionViewSet already provides /api/transactions/<id>/ for retrieving a single transaction.
     # The 'pk' parameter in ViewSet methods handles this.
     # So, TransactionDetailView is redundant.
-    # path('transactions/<int:transaction_id>/', TransactionDetailView.as_view(), name='transaction-detail'), # REMOVE THIS
+    path('transactions/<int:transaction_id>/', TransactionDetailView.as_view(), name='transaction-detail'), # REMOVE THIS
 
     # 4. Withdrawal Request:
     # WithdrawalViewSet already has a 'create' method handled by the router at /api/withdrawals/
     # So, WithdrawalRequestView is redundant.
-    # path('withdraw/', WithdrawalRequestView.as_view(), name='withdraw'), # REMOVE THIS
+    path('withdraw/', WithdrawalRequestView.as_view(), name='withdraw'), # REMOVE THIS
 
     # --- Paystack Webhook Endpoint (CRITICAL!) ---
     # This is where Paystack will send notifications for deposit successes, transfer failures, etc.
