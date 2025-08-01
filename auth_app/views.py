@@ -277,6 +277,50 @@ class VerifyOTPView(APIView):
         existing_otp.save()
 
         return Response({"message": "Account verified successfully. You can now log in."}, status=status.HTTP_200_OK)
+    
+
+class PinRegistrationView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """
+        Register a new PIN for the user.
+        """
+        user = get_user_from_token(request)
+        pin = request.data.get("pin"))
+        if not pin or len(pin) != 6 or not pin.isdigit():
+            return Response({"message": "PIN must be a 6-digit number."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if user.pin:
+            return Response({"message": "PIN alreadey exists. Use the update endpoint to change it."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user.pin = pin
+        user.save()
+        return Response({"message": "PIN registered successfully."}, status=status.HTTP_201_CREATED)
+    
+class PinUpdateView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        """
+        Update the user's PIN.
+        """
+        user = get_user_from_token(request)
+        pin = request.data.get("pin")
+
+        if not pin or len(pin) != 6 or not pin.isdigit():
+            return Response({"message": "PIN must be a 6-digit number."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not user.pin:
+            return Response({"message": "PIN does not exist. Use the registration endpoint to set it."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user.pin = pin
+        user.save()
+        return Response({"message": "PIN updated successfully."}, status=status.HTTP_200_OK)
+
+        
 
 @method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):

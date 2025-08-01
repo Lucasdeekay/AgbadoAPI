@@ -34,6 +34,7 @@ class User(AbstractUser):
     profile_picture = models.URLField(null=True, blank=True)
     referral_code = models.CharField(max_length=15, unique=True, null=True, blank=True)
     is_busy = models.BooleanField(default=False)
+    pin = models.CharField(max_length=6, null=True, blank=True) # User's PIN for additional security
 
     objects = UserManager()
 
