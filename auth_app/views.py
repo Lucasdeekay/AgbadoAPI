@@ -288,7 +288,7 @@ class PinRegistrationView(APIView):
         Register a new PIN for the user.
         """
         user = get_user_from_token(request)
-        pin = request.data.get("pin"))
+        pin = request.data.get("pin")
         if not pin or len(pin) != 6 or not pin.isdigit():
             return Response({"message": "PIN must be a 6-digit number."}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -320,7 +320,7 @@ class PinUpdateView(APIView):
         user.save()
         return Response({"message": "PIN updated successfully."}, status=status.HTTP_200_OK)
 
-        
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
