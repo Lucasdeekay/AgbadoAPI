@@ -9,9 +9,27 @@ import time
 import base64
 import hmac
 from decouple import config
+import string
 
 from agbado import settings
-from .models import OTP
+from .models import OTP, User
+
+
+def generate_unique_referral_code():
+    """
+    Generates a unique 8-character uppercase referral code.
+    The code consists of letters and numbers, all in uppercase.
+    """
+    # Characters to use for referral code (uppercase letters and numbers)
+    characters = string.ascii_uppercase + string.digits
+    
+    while True:
+        # Generate a random 8-character code
+        referral_code = ''.join(random.choice(characters) for _ in range(8))
+        
+        # Check if this code already exists in the database
+        if not User.objects.filter(referral_code=referral_code).exists():
+            return referral_code
 
 
 # Generate OTP

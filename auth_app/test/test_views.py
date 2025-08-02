@@ -757,3 +757,162 @@ class VerifyOTPViewTestCase(APITestCase):
 #         # Verify that the token belongs to the existing user
 #         token = Token.objects.get(user=user)
 #         self.assertEqual(response.data["token"], token.key)
+
+
+class ReferralCodeGenerationTestCase(APITestCase):
+    """
+    Test cases for referral code generation functionality.
+    """
+    
+    def setUp(self):
+        """
+        Set up test data for all test cases.
+        """
+        self.client = APIClient()
+        self.register_user_url = reverse('register-user')
+        self.register_service_provider_url = reverse('register-service-provider')
+        
+    def tearDown(self):
+        """
+        Clean up after tests are executed.
+        """
+        CustomUser.objects.all().delete()
+        OTP.objects.all().delete()
+        return super().tearDown()
+    
+    def test_user_registration_generates_referral_code(self):
+        """
+        Test that a new user gets a unique referral code upon registration.
+        """
+        data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john.doe@example.com",
+            "phone": "2348012345678",
+            "state": "Lagos",
+            "password": "password123"
+        }
+        
+        response = self.client.post(self.register_user_url, data, format='json')
+        
+        # Verify response status
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("token", response.data)
+        self.assertIn("user", response.data)
+        
+        # Verify the user was created with a referral code
+        user = CustomUser.objects.get(email=data['email'])
+        self.assertIsNotNone(user.referral_code)
+        self.assertEqual(len(user.referral_code), 8)  # Should be 8 characters
+        self.assertTrue(user.referral_code.isupper())  # Should be all uppercase
+        self.assertTrue(user.referral_code.isalnum())  # Should be alphanumeric
+        
+        # Verify referral code is unique
+        other_users = CustomUser.objects.exclude(id=user.id)
+        for other_user in other_users:
+            self.assertNotEqual(user.referral_code, other_user.referral_code)
+    
+    def test_service_provider_registration_generates_referral_code(self):
+        """
+        Test that a new service provider gets a unique referral code upon registration.
+        """
+        data = {
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "email": "jane.smith@example.com",
+            "phone": "2348098765432",
+            "state": "Abuja",
+            "password": "password123"
+        }
+        
+        response = self.client.post(self.register_service_provider_url, data, format='json')
+        
+        # Verify response status
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("token", response.data)
+        self.assertIn("user", response.data)
+        
+        # Verify the user was created with a referral code
+        user = CustomUser.objects.get(email=data['email'])
+        self.assertIsNotNone(user.referral_code)
+        self.assertEqual(len(user.referral_code), 8)  # Should be 8 characters
+        self.assertTrue(user.referral_code.isupper())  # Should be all uppercase
+        self.assertTrue(user.referral_code.isalnum())  # Should be alphanumeric
+        self.assertTrue(user.is_service_provider)  # Should be marked as service provider
+    
+    def test_multiple_users_have_unique_referral_codes(self):
+        """
+        Test that multiple users get unique referral codes.
+        """
+        users_data = [
+            {
+                "first_name": "User1",
+                "last_name": "Test",
+                "email": "user1@example.com",
+                "phone": "2348011111111",
+                "state": "Lagos",
+                "password": "password123"
+            },
+            {
+                "first_name": "User2",
+                "last_name": "Test",
+                "email": "user2@example.com",
+                "phone": "2348022222222",
+                "state": "Abuja",
+                "password": "password123"
+            },
+            {
+                "first_name": "User3",
+                "last_name": "Test",
+                "email": "user3@example.com",
+                "phone": "2348033333333",
+                "state": "Kano",
+                "password": "password123"
+            }
+        ]
+        
+        referral_codes = set()
+        
+        for user_data in users_data:
+            response = self.client.post(self.register_user_url, user_data, format='json')
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            
+            user = CustomUser.objects.get(email=user_data['email'])
+            self.assertIsNotNone(user.referral_code)
+            self.assertEqual(len(user.referral_code), 8)
+            self.assertTrue(user.referral_code.isupper())
+            self.assertTrue(user.referral_code.isalnum())
+            
+            # Verify uniqueness
+            self.assertNotIn(user.referral_code, referral_codes)
+            referral_codes.add(user.referral_code)
+    
+    def test_referral_code_format(self):
+        """
+        Test that referral codes follow the correct format (8 characters, uppercase, alphanumeric).
+        """
+        data = {
+            "first_name": "Test",
+            "last_name": "User",
+            "email": "test.user@example.com",
+            "phone": "2348044444444",
+            "state": "Lagos",
+            "password": "password123"
+        }
+        
+        response = self.client.post(self.register_user_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        user = CustomUser.objects.get(email=data['email'])
+        referral_code = user.referral_code
+        
+        # Test format requirements
+        self.assertEqual(len(referral_code), 8)
+        self.assertTrue(referral_code.isupper())
+        self.assertTrue(referral_code.isalnum())
+        
+        # Should contain at least one letter and one number
+        has_letter = any(c.isalpha() for c in referral_code)
+        has_number = any(c.isdigit() for c in referral_code)
+        self.assertTrue(has_letter, "Referral code should contain at least one letter")
+        self.assertTrue(has_number, "Referral code should contain at least one number")

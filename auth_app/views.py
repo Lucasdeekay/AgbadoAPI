@@ -107,10 +107,6 @@ class RegisterServiceProviderView(APIView):
             return Response({"message": "A user with this phone number already exists."},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        if CustomUser.objects.filter(referral_code=referral_code).exists():
-            referer = CustomUser.objects.get(referral_code=referral_code)
-            Referral.objects.create(user=user, referer=referer)
-
         user_data = {
             'first_name': first_name,
             'last_name': last_name,
@@ -125,6 +121,11 @@ class RegisterServiceProviderView(APIView):
             user = serializer.save()
             user.set_password(password)
             user.is_service_provider = True
+
+            # Handle referral if referral_code was provided
+            if referral_code and CustomUser.objects.filter(referral_code=referral_code).exists():
+                referer = CustomUser.objects.get(referral_code=referral_code)
+                Referral.objects.create(user=user, referer=referer)
 
             # user.is_active = False  # Deactivate account until verification
             user.save()
@@ -166,13 +167,6 @@ class RegisterUserView(APIView):
             return Response({"message": "A user with this phone number already exists."},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        if CustomUser.objects.filter(referral_code=referral_code).exists():
-            referer = CustomUser.objects.get(referral_code=referral_code)
-            Referral.objects.create(user=user, referer=referer)
-            user_reward = UserReward.objects.get_or_create(user=referer)
-            user_reward.points += REFERRAL_REWARD # Subject to change
-            user_reward.save()
-
         user_data = {
             'first_name': first_name,
             'last_name': last_name,
@@ -186,6 +180,14 @@ class RegisterUserView(APIView):
         if serializer.is_valid():
             user = serializer.save()
             user.set_password(password)
+
+            # Handle referral if referral_code was provided
+            if referral_code and CustomUser.objects.filter(referral_code=referral_code).exists():
+                referer = CustomUser.objects.get(referral_code=referral_code)
+                Referral.objects.create(user=user, referer=referer)
+                user_reward, created = UserReward.objects.get_or_create(user=referer)
+                user_reward.points += REFERRAL_REWARD # Subject to change
+                user_reward.save()
 
             # user.is_active = False  # Deactivate account until verification
             user.save()
@@ -326,6 +328,25 @@ class PinUpdateView(APIView):
         user.pin = pin
         user.save()
         return Response({"message": "PIN updated successfully."}, status=status.HTTP_200_OK)
+
+class PinAuthView(APIView):
+    """
+    Login the user using pin
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = get_user_from_token(request)
+        pin = request.data.get("pin")
+
+        if not pin or len(pin) != 6 or not pin.isdigit():
+            return Response({"message": "PIN must be a 6-digit number."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if user.pin != pin:
+            return Response({"message": "Invalid PIN. Try again"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"message": "PIN authentication successfully."}, status=status.HTTP_200_OK)
 
 
 

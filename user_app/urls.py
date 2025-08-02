@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from .views import DashboardView, GetKYCDetailsView, UpdateUserProfileView, UpdateKYCView, ChangePasswordView
+from .views import DashboardView, GetKYCDetailsView, GetReferralCode, UpdateUserProfileView, UpdateKYCView, ChangePasswordView
 from .viewsets import DailyTaskViewSet, GiftViewSet, TaskCompletionViewSet, UserGiftViewSet, UserRewardViewSet, UserActivityViewSet, LeisureAccessViewSet
 
 router = DefaultRouter()
@@ -20,5 +20,6 @@ urlpatterns = [
     path('kyc/', GetKYCDetailsView.as_view(), name='get_user_kyc'),
     path('kyc/update/', UpdateKYCView.as_view(), name='update_user_kyc'),
     path('change-password/', ChangePasswordView.as_view(), name='change_password'),
+    path('referral-code/', GetReferralCode.as_view(), name='get_referral_code'),
     path('api/', include(router.urls)),  # All routes are prefixed with 'api/'
 ]

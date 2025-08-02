@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from .views import CompleteWebAuthnAuthenticationView, CompleteWebAuthnRegistrationView, DeleteAccountView, DeleteWebAuthnCredentialView, ListWebAuthnCredentialsView, RegisterServiceProviderView, LoginView, LogoutView, ForgotPasswordView, RegisterUserView, ResetPasswordView, SendOTPView, StartWebAuthnAuthenticationView, StartWebAuthnRegistrationView, UpdateIsBusyView, VerifyOTPView, \
-    GoogleAppleAuthView
+    GoogleAppleAuthView, PinRegistrationView, PinUpdateView, PinAuthView
 from .viewsets import UserViewSet, KYCViewSet, OTPViewSet, ReferralViewSet
 
 router = DefaultRouter()
@@ -22,6 +22,12 @@ urlpatterns = [
     path('delete-account/', DeleteAccountView.as_view(), name='delete-account'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('update-status/', UpdateIsBusyView.as_view(), name='update-status'),
+    
+    # PIN Authentication endpoints
+    path('pin/register/', PinRegistrationView.as_view(), name='pin-register'),
+    path('pin/update/', PinUpdateView.as_view(), name='pin-update'),
+    path('pin/auth/', PinAuthView.as_view(), name='pin-auth'),
+    
     path('login/google-or-apple/', GoogleAppleAuthView.as_view(), name='google-or-apple-auth'),
     # WebAuthn (FIDO2) Biometric Authentication
     path('webauthn/register/start/', StartWebAuthnRegistrationView.as_view(), name='webauthn-register-start'),
@@ -32,3 +38,4 @@ urlpatterns = [
     path('webauthn/credentials/<int:pk>/delete/', DeleteWebAuthnCredentialView.as_view(), name='webauthn-credential-delete'),
     path('api/', include(router.urls)),  # All routes are prefixed with 'api/'
 ]
+

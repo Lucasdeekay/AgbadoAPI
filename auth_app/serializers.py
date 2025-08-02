@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from rest_framework import serializers
 
-from auth_app.utils import upload_to_cloudinary
+from auth_app.utils import upload_to_cloudinary, generate_unique_referral_code
 from .models import User, KYC, OTP, Referral
 
 
@@ -32,6 +32,10 @@ class UserSerializer(serializers.ModelSerializer):
         if image_file:
             image_url = upload_to_cloudinary(image_file)
             validated_data['profile_picture'] = image_url
+        
+        # Generate unique referral code if not provided
+        if not validated_data.get('referral_code'):
+            validated_data['referral_code'] = generate_unique_referral_code()
         
         # Remove password from validated_data if it's there and create user with create_user
         password = validated_data.pop('password', None)

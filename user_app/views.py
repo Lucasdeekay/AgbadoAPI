@@ -6,6 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from decouple import config
 
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -268,3 +269,13 @@ class ChangePasswordView(APIView):
         )
 
         return Response({"message": "Password has been successfully changed."}, status=status.HTTP_200_OK)
+
+
+class GetReferralCode(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = get_user_from_token(request)
+        referral_code = user.referral_code
+        return Response({"referral_code": referral_code}, status=status.HTTP_200_OK)
