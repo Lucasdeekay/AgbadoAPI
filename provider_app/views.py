@@ -13,10 +13,10 @@ from auth_app.views import get_user_from_token
 from notification_app.models import Notification
 from provider_app.models import ServiceProvider
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class CreateServiceProviderView(APIView):
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user = get_user_from_token(request)
@@ -84,10 +84,10 @@ class CreateServiceProviderView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class EditServiceProviderView(APIView):
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user = get_user_from_token(request)
@@ -161,10 +161,10 @@ class EditServiceProviderView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class GetServiceProviderDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = get_user_from_token(request)

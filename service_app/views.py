@@ -7,6 +7,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 
 from auth_app.utils import upload_to_cloudinary
 from auth_app.views import get_user_from_token
@@ -17,9 +18,10 @@ from service_app.models import ServiceRequest, ServiceRequestBid, SubService, Se
 from service_app.serializers import BookingSerializer, ServiceRequestBidSerializer, ServiceRequestSerializer, ServiceSerializer, SubServiceSerializer
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class GetAllServicesDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
+    permission_classes  = [IsAuthenticated]
 
     def get(self, request):
         try:
@@ -77,9 +79,10 @@ class GetAllServicesDetailsView(APIView):
         except Exception as e:
             return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class GetServiceDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
+    permission_classes  = [IsAuthenticated]
 
     def get(self, request, service_id):
         try:
@@ -118,9 +121,10 @@ class GetServiceDetailsView(APIView):
         except Exception as e:
             return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)     
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class GetSubServiceDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
+    permission_classes  = [IsAuthenticated]
 
     def get(self, request, sub_service_id):
         try:
@@ -143,9 +147,10 @@ class GetSubServiceDetailsView(APIView):
         except Exception as e:
             return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class AddServiceView(APIView):
     authentication_classes = [TokenAuthentication]
+    permission_classes  = [IsAuthenticated]
 
     def post(self, request):
         user = get_user_from_token(request)
@@ -194,9 +199,10 @@ class AddServiceView(APIView):
         }
         return Response({"message": "Service added successfully.", "service": service_data}, status=status.HTTP_201_CREATED)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class AddSubServiceView(APIView):
     authentication_classes = [TokenAuthentication]
+    permission_classes  = [IsAuthenticated]
 
     def post(self, request, service_id):
         user = get_user_from_token(request)
@@ -237,9 +243,10 @@ class AddSubServiceView(APIView):
         return Response({"message": "Subservice added successfully.", "subservice": subservice_data}, status=status.HTTP_201_CREATED)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class EditServiceView(APIView):
     authentication_classes = [TokenAuthentication]
+    permission_classes  = [IsAuthenticated]
 
     def post(self, request, service_id):
         user = get_user_from_token(request)
@@ -264,9 +271,10 @@ class EditServiceView(APIView):
         return Response({"message": "Service updated successfully.", "service": service_data}, status=status.HTTP_200_OK)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class EditSubServiceView(APIView):
     authentication_classes = [TokenAuthentication]
+    permission_classes  = [IsAuthenticated]
 
     def post(self, request, subservice_id):
         user = get_user_from_token(request)
@@ -291,11 +299,10 @@ class EditSubServiceView(APIView):
         return Response({"message": "Subservice updated successfully.", "subservice": subservice_data}, status=status.HTTP_200_OK)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class ServiceProviderBookingsView(APIView):
     authentication_classes = [TokenAuthentication]
-
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, *args, **kwargs):
         service_provider = get_user_from_token(request)  # Assuming the authenticated user is a service provider
@@ -303,11 +310,10 @@ class ServiceProviderBookingsView(APIView):
         serializer = BookingSerializer(bookings, many=True)
         return Response({'bookings': serializer.data})
     
-@method_decorator(csrf_exempt, name='dispatch')
+
 class ServiceProviderBidsView(APIView):
     authentication_classes = [TokenAuthentication]
-
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, *args, **kwargs):
         user = get_user_from_token(request)
@@ -331,11 +337,10 @@ class ServiceProviderBidsView(APIView):
             'bids': bid_serializer.data,
         })
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class SubmitBidView(APIView):
     authentication_classes = [TokenAuthentication]
-
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     
     def post(self, request, service_request_id, *args, **kwargs):
         service_provider = get_user_from_token(request)
@@ -385,11 +390,10 @@ class SubmitBidView(APIView):
 
             return Response({"message": "Bid submitted successfully"}, status=status.HTTP_201_CREATED)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class CancelBookingView(APIView):
     authentication_classes = [TokenAuthentication]
-
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     
     def post(self, request, booking_id, *args, **kwargs):
         service_provider = get_user_from_token(request)
@@ -409,11 +413,10 @@ class CancelBookingView(APIView):
         
         return Response({"message": "Booking cancelled successfully"}, status=status.HTTP_200_OK)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class CompleteBookingView(APIView):
     authentication_classes = [TokenAuthentication]
-
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     
     def post(self, request, booking_id, *args, **kwargs):
         service_provider = get_user_from_token(request)

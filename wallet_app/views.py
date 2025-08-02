@@ -401,7 +401,7 @@ class WithdrawalRequestView(APIView):
         
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(csrf_exempt, name='dispatch') # Disable CSRF for webhook endpoint
 class PaystackWebhookView(APIView):
     authentication_classes = [] # No authentication for webhooks
     permission_classes = []     # No permissions for webhooks

@@ -26,10 +26,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class DashboardView(APIView):
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
@@ -85,10 +85,10 @@ class DashboardView(APIView):
         return Response(response_data, status=status.HTTP_200_OK)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class GetKYCDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         # Fetch user details
@@ -114,10 +114,10 @@ class GetKYCDetailsView(APIView):
         except Exception as e:
             return Response({"message": f"Error fetching kyc details: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class UpdateUserProfileView(APIView):
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user = get_user_from_token(request)
@@ -170,10 +170,10 @@ class UpdateUserProfileView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class UpdateKYCView(APIView):
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated] # Uncomment and set this up as needed
+    permission_classes = [IsAuthenticated] # Uncomment and set this up as needed
 
     def post(self, request):
         user = get_user_from_token(request)
@@ -234,10 +234,10 @@ class UpdateKYCView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class ChangePasswordView(APIView):
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """

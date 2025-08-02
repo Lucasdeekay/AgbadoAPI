@@ -82,7 +82,6 @@ def delete_token(request):
     except (IndexError, ValueError):
         raise AuthenticationFailed('Invalid Authorization header format')
 
-@method_decorator(csrf_exempt, name='dispatch')
 class RegisterServiceProviderView(APIView):
     def post(self, request):
         """
@@ -142,7 +141,7 @@ class RegisterServiceProviderView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class RegisterUserView(APIView):
     def post(self, request):
         """
@@ -205,7 +204,7 @@ class RegisterUserView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class SendOTPView(APIView):
     def post(self, request):
         """
@@ -244,7 +243,7 @@ class SendOTPView(APIView):
 
         return Response({"message": "OTP successfully sent. You can now log in."}, status=status.HTTP_200_OK)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class VerifyOTPView(APIView):
     def post(self, request):
         """
@@ -350,7 +349,7 @@ class PinAuthView(APIView):
 
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class LoginView(APIView):
     def post(self, request):
         """
@@ -391,7 +390,7 @@ class LoginView(APIView):
         else:
             return Response({"message": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class LogoutView(APIView):
     authentication_classes = [TokenAuthentication]
 
@@ -407,7 +406,7 @@ class LogoutView(APIView):
         except AuthenticationFailed as e:
             return Response({'detail': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class ForgotPasswordView(APIView):
     def post(self, request):
         """
@@ -449,7 +448,7 @@ class ForgotPasswordView(APIView):
 
         return Response({"message": "OTP sent to your email and phone number."}, status=status.HTTP_200_OK)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class ResetPasswordView(APIView):
     def post(self, request):
         """
@@ -481,7 +480,7 @@ class ResetPasswordView(APIView):
 
         return Response({"message": "Password has been successfully reset."}, status=status.HTTP_200_OK)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class UpdateIsBusyView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -508,7 +507,7 @@ class UpdateIsBusyView(APIView):
                 "message": f'An unexpected error occurred: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class GoogleAppleAuthView(APIView):
     def post(self, request):
         data = request.data
@@ -547,7 +546,7 @@ class GoogleAppleAuthView(APIView):
 
 # --- WebAuthn (FIDO2) Biometric Authentication Views ---
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class StartWebAuthnRegistrationView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -598,7 +597,7 @@ class StartWebAuthnRegistrationView(APIView):
             logger.error(f"Error starting WebAuthn registration for user {user.email}: {e}")
             return Response({"message": f"Failed to start WebAuthn registration: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class CompleteWebAuthnRegistrationView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -663,7 +662,7 @@ class CompleteWebAuthnRegistrationView(APIView):
             return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class StartWebAuthnAuthenticationView(APIView):
     authentication_classes = [] # No token auth for initial login
     permission_classes = [AllowAny]
@@ -710,7 +709,7 @@ class StartWebAuthnAuthenticationView(APIView):
             return Response({"message": f"Failed to start WebAuthn authentication: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class CompleteWebAuthnAuthenticationView(APIView):
     authentication_classes = [] # No token auth for initial login
     permission_classes = [AllowAny]
@@ -777,7 +776,7 @@ class CompleteWebAuthnAuthenticationView(APIView):
             logger.error(f"Unexpected error completing WebAuthn authentication for user {user.email}: {e}")
             return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class DeleteWebAuthnCredentialView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -798,7 +797,7 @@ class DeleteWebAuthnCredentialView(APIView):
         except Exception as e:
             return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class ListWebAuthnCredentialsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -822,7 +821,7 @@ class ListWebAuthnCredentialsView(APIView):
         return Response({"credentials": data}, status=status.HTTP_200_OK)
 
 # New view for deleting a user account
-@method_decorator(csrf_exempt, name='dispatch')
+
 class DeleteAccountView(APIView):
     authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]1
