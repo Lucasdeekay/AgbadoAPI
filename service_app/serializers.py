@@ -1,98 +1,276 @@
+"""
+Serializers for service app models.
+
+This module contains serializers for handling data validation and transformation
+for service-related models including services, sub-services, requests, bids, and bookings.
+"""
+
 from rest_framework import serializers
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 from auth_app.utils import upload_to_cloudinary
 from .models import Service, SubService, ServiceRequest, ServiceRequestBid, Booking
-from django.conf import settings  # Import settings for MEDIA_URL
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-# Serializer for Service model
 class ServiceSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Service model.
+    
+    Handles service data serialization and deserialization including
+    service information, pricing, and image uploads.
+    """
     image = serializers.SerializerMethodField()
 
     class Meta:
         model = Service
         fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'updated_at')
+        extra_kwargs = {
+            'title': {'required': True},
+            'description': {'required': True},
+            'category': {'required': True},
+            'min_price': {'required': True},
+            'max_price': {'required': True}
+        }
 
     def get_image(self, obj):
-        return obj.image # Returns the string URL or None if not set/not a file
+        """
+        Get service image URL or None.
+        
+        Returns the service image URL if it exists, otherwise None.
+        """
+        return obj.image or None
+
+    def validate_title(self, value):
+        """
+        Validate service title.
+        
+        Ensures title is not empty and has reasonable length.
+        """
+        if not value or not value.strip():
+            raise serializers.ValidationError("Service title cannot be empty.")
+        
+        if len(value) > 200:
+            raise serializers.ValidationError("Service title is too long. Maximum 200 characters.")
+        
+        return value.strip()
+
+    def validate_min_price(self, value):
+        """
+        Validate minimum price.
+        
+        Ensures minimum price is positive.
+        """
+        if value <= 0:
+            raise serializers.ValidationError("Minimum price must be greater than zero.")
+        return value
+
+    def validate_max_price(self, value):
+        """
+        Validate maximum price.
+        
+        Ensures maximum price is positive.
+        """
+        if value <= 0:
+            raise serializers.ValidationError("Maximum price must be greater than zero.")
+        return value
+
+    def validate(self, data):
+        """
+        Validate price range consistency.
+        
+        Ensures maximum price is greater than or equal to minimum price.
+        """
+        min_price = data.get('min_price')
+        max_price = data.get('max_price')
+        
+        if min_price and max_price and max_price < min_price:
+            raise serializers.ValidationError(
+                "Maximum price must be greater than or equal to minimum price."
+            )
+        
+        return data
 
     def create(self, validated_data):
-        image_file = None
-        # Safely check if 'request' and 'FILES' exist in context
-        if 'request' in self.context and self.context['request'].FILES:
-            image_file = self.context['request'].FILES.get('image')
+        """
+        Create a new service instance.
         
-        if image_file:
-            validated_data['image'] = upload_to_cloudinary(image_file)
-        return super().create(validated_data)
+        Handles service image upload to Cloudinary.
+        """
+        try:
+            image_file = None
+            if 'request' in self.context and self.context['request'].FILES:
+                image_file = self.context['request'].FILES.get('image')
+            
+            if image_file:
+                validated_data['image'] = upload_to_cloudinary(image_file)
+            
+            service = super().create(validated_data)
+            logger.info(f"Service created: {service.title}")
+            return service
+            
+        except Exception as e:
+            logger.error(f"Error creating service: {str(e)}")
+            raise serializers.ValidationError(f"Error creating service: {str(e)}")
 
     def update(self, instance, validated_data):
-        image_file = None
-        # Safely check if 'request' and 'FILES' exist in context
-        if 'request' in self.context and self.context['request'].FILES:
-            image_file = self.context['request'].FILES.get('image')
-
-        if image_file:
-            # Only update the image if a new file is provided
-            validated_data['image'] = upload_to_cloudinary(image_file)
-        # Important: If image_file is None, we intentionally *do not* add 'image' to validated_data
-        # unless it was explicitly sent as None in the main request body. This prevents
-        # unintentionally clearing the image if the client simply didn't send a new one.
+        """
+        Update an existing service instance.
         
-        return super().update(instance, validated_data)
+        Handles service image upload to Cloudinary.
+        """
+        try:
+            image_file = None
+            if 'request' in self.context and self.context['request'].FILES:
+                image_file = self.context['request'].FILES.get('image')
+
+            if image_file:
+                validated_data['image'] = upload_to_cloudinary(image_file)
+            
+            service = super().update(instance, validated_data)
+            logger.info(f"Service updated: {service.title}")
+            return service
+            
+        except Exception as e:
+            logger.error(f"Error updating service: {str(e)}")
+            raise serializers.ValidationError(f"Error updating service: {str(e)}")
 
 
 class SubServiceSerializer(serializers.ModelSerializer):
+    """
+    Serializer for SubService model.
+    
+    Handles sub-service data serialization and deserialization including
+    sub-service information and image uploads.
+    """
     image = serializers.SerializerMethodField()
 
     class Meta:
         model = SubService
         fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'updated_at')
+        extra_kwargs = {
+            'title': {'required': True},
+            'description': {'required': True},
+            'service': {'required': True}
+        }
 
     def get_image(self, obj):
-        return obj.image or None  # Returns the string URL or None if not set/not a file
+        """
+        Get sub-service image URL or None.
+        
+        Returns the sub-service image URL if it exists, otherwise None.
+        """
+        return obj.image or None
+
+    def validate_title(self, value):
+        """
+        Validate sub-service title.
+        
+        Ensures title is not empty and has reasonable length.
+        """
+        if not value or not value.strip():
+            raise serializers.ValidationError("Sub-service title cannot be empty.")
+        
+        if len(value) > 200:
+            raise serializers.ValidationError("Sub-service title is too long. Maximum 200 characters.")
+        
+        return value.strip()
 
     def create(self, validated_data):
-        image_file = None
-        if 'request' in self.context and self.context['request'].FILES:
-            image_file = self.context['request'].FILES.get('image')
+        """
+        Create a new sub-service instance.
+        
+        Handles sub-service image upload to Cloudinary.
+        """
+        try:
+            image_file = None
+            if 'request' in self.context and self.context['request'].FILES:
+                image_file = self.context['request'].FILES.get('image')
 
-        if image_file:
-            validated_data['image'] = upload_to_cloudinary(image_file)
-        return super().create(validated_data)
+            if image_file:
+                validated_data['image'] = upload_to_cloudinary(image_file)
+            
+            sub_service = super().create(validated_data)
+            logger.info(f"Sub-service created: {sub_service.title}")
+            return sub_service
+            
+        except Exception as e:
+            logger.error(f"Error creating sub-service: {str(e)}")
+            raise serializers.ValidationError(f"Error creating sub-service: {str(e)}")
 
     def update(self, instance, validated_data):
-        image_file = None
-        if 'request' in self.context and self.context['request'].FILES:
-            image_file = self.context['request'].FILES.get('image')
-
-        if image_file:
-            validated_data['image'] = upload_to_cloudinary(image_file)
+        """
+        Update an existing sub-service instance.
         
-        return super().update(instance, validated_data)
+        Handles sub-service image upload to Cloudinary.
+        """
+        try:
+            image_file = None
+            if 'request' in self.context and self.context['request'].FILES:
+                image_file = self.context['request'].FILES.get('image')
+
+            if image_file:
+                validated_data['image'] = upload_to_cloudinary(image_file)
+            
+            sub_service = super().update(instance, validated_data)
+            logger.info(f"Sub-service updated: {sub_service.title}")
+            return sub_service
+            
+        except Exception as e:
+            logger.error(f"Error updating sub-service: {str(e)}")
+            raise serializers.ValidationError(f"Error updating sub-service: {str(e)}")
 
 
 class ServiceRequestSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ServiceRequest model.
+    
+    Handles service request data serialization and deserialization including
+    request information, user details, and image uploads.
+    """
     image = serializers.SerializerMethodField()
-    user = serializers.SerializerMethodField() # This will now return full user data
+    user = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceRequest
         fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'updated_at', 'status')
+        extra_kwargs = {
+            'user': {'required': True},
+            'title': {'required': True},
+            'description': {'required': True},
+            'category': {'required': True},
+            'price': {'required': True}
+        }
 
     def get_image(self, obj):
-        return obj.image or None  # Returns the string URL or None if not set/not a file
+        """
+        Get service request image URL or None.
+        
+        Returns the service request image URL if it exists, otherwise None.
+        """
+        return obj.image or None
 
     def get_user(self, obj):
+        """
+        Get user information for service request.
+        
+        Returns user data including ID, email, name, and profile picture.
+        """
         request = self.context.get('request')
-        # Ensure profile_picture URL is built correctly, handling None
         profile_pic_url = None
+        
         if obj.user.profile_picture and hasattr(obj.user.profile_picture, 'url'):
             if request:
                 profile_pic_url = request.build_absolute_uri(obj.user.profile_picture.url)
             else:
-                profile_pic_url = obj.user.profile_picture.url # Fallback to relative URL
-        elif isinstance(obj.user.profile_picture, str): # If it's already a string URL
+                profile_pic_url = obj.user.profile_picture.url
+        elif isinstance(obj.user.profile_picture, str):
             profile_pic_url = obj.user.profile_picture
 
         return {
@@ -100,92 +278,225 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
             "email": obj.user.email,
             "first_name": obj.user.first_name,
             "last_name": obj.user.last_name,
-            "profile_picture": profile_pic_url, # Now includes the full URL
+            "profile_picture": profile_pic_url,
         }
 
-    def create(self, validated_data):
-        image_file = None
-        if 'request' in self.context and self.context['request'].FILES:
-            image_file = self.context['request'].FILES.get('image')
+    def validate_title(self, value):
+        """
+        Validate service request title.
+        
+        Ensures title is not empty and has reasonable length.
+        """
+        if not value or not value.strip():
+            raise serializers.ValidationError("Service request title cannot be empty.")
+        
+        if len(value) > 200:
+            raise serializers.ValidationError("Service request title is too long. Maximum 200 characters.")
+        
+        return value.strip()
 
-        if image_file:
-            validated_data['image'] = upload_to_cloudinary(image_file)
-        return super().create(validated_data)
+    def validate_price(self, value):
+        """
+        Validate service request price.
+        
+        Ensures price is positive.
+        """
+        if value <= 0:
+            raise serializers.ValidationError("Price must be greater than zero.")
+        return value
+
+    def create(self, validated_data):
+        """
+        Create a new service request instance.
+        
+        Handles service request image upload to Cloudinary.
+        """
+        try:
+            image_file = None
+            if 'request' in self.context and self.context['request'].FILES:
+                image_file = self.context['request'].FILES.get('image')
+
+            if image_file:
+                validated_data['image'] = upload_to_cloudinary(image_file)
+            
+            service_request = super().create(validated_data)
+            logger.info(f"Service request created: {service_request.title}")
+            return service_request
+            
+        except Exception as e:
+            logger.error(f"Error creating service request: {str(e)}")
+            raise serializers.ValidationError(f"Error creating service request: {str(e)}")
 
     def update(self, instance, validated_data):
-        image_file = None
-        if 'request' in self.context and self.context['request'].FILES:
-            image_file = self.context['request'].FILES.get('image')
-
-        if image_file:
-            validated_data['image'] = upload_to_cloudinary(image_file)
+        """
+        Update an existing service request instance.
         
-        return super().update(instance, validated_data)
+        Handles service request image upload to Cloudinary.
+        """
+        try:
+            image_file = None
+            if 'request' in self.context and self.context['request'].FILES:
+                image_file = self.context['request'].FILES.get('image')
+
+            if image_file:
+                validated_data['image'] = upload_to_cloudinary(image_file)
+            
+            service_request = super().update(instance, validated_data)
+            logger.info(f"Service request updated: {service_request.title}")
+            return service_request
+            
+        except Exception as e:
+            logger.error(f"Error updating service request: {str(e)}")
+            raise serializers.ValidationError(f"Error updating service request: {str(e)}")
 
 
-# Serializer for ServiceRequestBid model
 class ServiceRequestBidSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ServiceRequestBid model.
+    
+    Handles service request bid data serialization and deserialization including
+    bid information, service provider details, and service request details.
+    """
     service_provider = serializers.SerializerMethodField()
-    service_request = serializers.SerializerMethodField() # Added service_request field
+    service_request = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceRequestBid
         fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'updated_at')
+        extra_kwargs = {
+            'service_provider': {'required': True},
+            'service_request': {'required': True},
+            'bid_amount': {'required': True},
+            'proposal': {'required': True}
+        }
 
     def get_service_provider(self, obj):
+        """
+        Get service provider information for bid.
+        
+        Returns service provider data including ID, email, name, and profile picture.
+        """
         request = self.context.get('request')
-        user_data = {
+        profile_pic_url = None
+        
+        if obj.service_provider.profile_picture and hasattr(obj.service_provider.profile_picture, 'url'):
+            if request:
+                profile_pic_url = request.build_absolute_uri(obj.service_provider.profile_picture.url)
+            else:
+                profile_pic_url = obj.service_provider.profile_picture.url
+        elif isinstance(obj.service_provider.profile_picture, str):
+            profile_pic_url = obj.service_provider.profile_picture
+
+        return {
             "id": obj.service_provider.id,
             "email": obj.service_provider.email,
             "first_name": obj.service_provider.first_name,
             "last_name": obj.service_provider.last_name,
-            "profile_picture": request.build_absolute_uri(obj.service_provider.profile_picture.url) if obj.service_provider.profile_picture and obj.service_provider.profile_picture.url else None,
+            "profile_picture": profile_pic_url,
         }
-        return user_data
 
-    def get_service_request(self, obj): # method to get service request details.
-        request = self.context.get('request')
-        service_request_data = {
+    def get_service_request(self, obj):
+        """
+        Get service request information for bid.
+        
+        Returns service request data including ID, user, title, description, and price.
+        """
+        return {
             "id": obj.service_request.id,
-            "user": obj.service_request.user.id, # or serialize the user details similarly
+            "user": obj.service_request.user.id,
             "title": obj.service_request.title,
             "description": obj.service_request.description,
             "image": obj.service_request.image,
-            "price": str(obj.service_request.price), # Decimal to String
+            "price": str(obj.service_request.price),
             "category": obj.service_request.category,
             "status": obj.service_request.status,
             "created_at": obj.service_request.created_at,
             "updated_at": obj.service_request.updated_at,
         }
-        return service_request_data
 
-# Serializer for Booking model
+    def validate_bid_amount(self, value):
+        """
+        Validate bid amount.
+        
+        Ensures bid amount is positive.
+        """
+        if value <= 0:
+            raise serializers.ValidationError("Bid amount must be greater than zero.")
+        return value
+
+    def validate_proposal(self, value):
+        """
+        Validate proposal content.
+        
+        Ensures proposal is not empty and has reasonable length.
+        """
+        if not value or not value.strip():
+            raise serializers.ValidationError("Proposal cannot be empty.")
+        
+        if len(value) > 2000:
+            raise serializers.ValidationError("Proposal is too long. Maximum 2000 characters.")
+        
+        return value.strip()
+
+
 class BookingSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Booking model.
+    
+    Handles booking data serialization and deserialization including
+    booking information, user details, and service provider details.
+    """
     user = serializers.SerializerMethodField()
     service_provider = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
         fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'updated_at')
+        extra_kwargs = {
+            'user': {'required': True},
+            'service_provider': {'required': True},
+            'service_request': {'required': True},
+            'booking_date': {'required': True},
+            'booking_time': {'required': True}
+        }
 
     def get_user(self, obj):
-        request = self.context.get('request')
-        user_data = {
+        """
+        Get user information for booking.
+        
+        Returns user data including ID, email, name, and profile picture.
+        """
+        return {
             "id": obj.user.id,
             "email": obj.user.email,
             "first_name": obj.user.first_name,
             "last_name": obj.user.last_name,
             "profile_picture": obj.user.profile_picture,
         }
-        return user_data
 
     def get_service_provider(self, obj):
-        request = self.context.get('request')
-        provider_data = {
+        """
+        Get service provider information for booking.
+        
+        Returns service provider data including ID, email, name, and profile picture.
+        """
+        return {
             "id": obj.service_provider.id,
             "email": obj.service_provider.email,
             "first_name": obj.service_provider.first_name,
             "last_name": obj.service_provider.last_name,
             "profile_picture": obj.service_provider.profile_picture,
         }
-        return provider_data
+
+    def validate_booking_date(self, value):
+        """
+        Validate booking date.
+        
+        Ensures booking date is not in the past.
+        """
+        from django.utils import timezone
+        if value < timezone.now().date():
+            raise serializers.ValidationError("Booking date cannot be in the past.")
+        return value

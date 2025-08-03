@@ -1,11 +1,13 @@
+"""
+User app views for handling user-related operations.
+
+This module contains views for user dashboard, profile management, KYC operations,
+and other user-specific functionality.
+"""
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, DatabaseError
 from django.utils import timezone
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-
-from decouple import config
-
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -14,7 +16,8 @@ from rest_framework.authentication import TokenAuthentication
 
 from auth_app.models import KYC
 from auth_app.serializers import KYCSerializer
-from auth_app.utils import log_to_server, upload_to_cloudinary, write_to_file
+from decouple import config
+from auth_app.utils import upload_to_cloudinary
 from auth_app.views import get_user_from_token
 from notification_app.models import Notification
 from wallet_app.models import Wallet, Transaction
@@ -22,14 +25,18 @@ from wallet_app.serializers import TransactionSerializer
 
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class DashboardView(APIView):
+    """
+    Dashboard view for authenticated users.
+    
+    Returns user details, wallet information, recent transactions,
+    and notification status.
+    """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
@@ -85,10 +92,15 @@ class DashboardView(APIView):
         return Response(response_data, status=status.HTTP_200_OK)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class GetKYCDetailsView(APIView):
+    """
+    Retrieve KYC details for the authenticated user.
+    
+    Returns the user's KYC information including verification status
+    and document details.
+    """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         # Fetch user details
@@ -114,10 +126,15 @@ class GetKYCDetailsView(APIView):
         except Exception as e:
             return Response({"message": f"Error fetching kyc details: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@method_decorator(csrf_exempt, name='dispatch')
 class UpdateUserProfileView(APIView):
+    """
+    Update user profile information.
+    
+    Allows users to update their phone number, state, and profile picture.
+    Creates a notification when profile is successfully updated.
+    """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user = get_user_from_token(request)
@@ -170,10 +187,15 @@ class UpdateUserProfileView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-@method_decorator(csrf_exempt, name='dispatch')
 class UpdateKYCView(APIView):
+    """
+    Update KYC information for the authenticated user.
+    
+    Handles KYC document uploads and updates verification status.
+    Supports partial updates of KYC information.
+    """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated] # Uncomment and set this up as needed
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user = get_user_from_token(request)
@@ -234,10 +256,15 @@ class UpdateKYCView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class ChangePasswordView(APIView):
+    """
+    Change user password.
+    
+    Allows authenticated users to change their password.
+    Validates old password before allowing the change.
+    """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -272,6 +299,11 @@ class ChangePasswordView(APIView):
 
 
 class GetReferralCode(APIView):
+    """
+    Get user's referral code.
+    
+    Returns the unique referral code for the authenticated user.
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 

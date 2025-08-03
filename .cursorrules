@@ -1,0 +1,178 @@
+# Django Project Rules and Best Practices
+# This file contains rules and guidelines for maintaining code quality in the AgbadoAPI project
+
+## Project Structure
+- Follow Django's recommended project structure with apps in separate directories
+- Each app should have: models.py, views.py, urls.py, serializers.py, admin.py, tests.py
+- Use descriptive app names (e.g., user_app, auth_app, wallet_app)
+- Keep the main project settings in agbado/settings.py
+
+## Code Style and Formatting
+- Follow PEP 8 style guidelines for Python code
+- Use 4 spaces for indentation (no tabs)
+- Maximum line length: 88 characters (Black formatter standard)
+- Use meaningful variable and function names
+- Add docstrings to all classes and functions
+- Use type hints where appropriate
+
+## Django Models
+- Always define `__str__` method for models
+- Use meaningful field names and appropriate field types
+- Set `max_length` for CharField and TextField where appropriate
+- Use `related_name` for ForeignKey relationships to avoid reverse accessor clashes
+- Use `on_delete` parameter for all ForeignKey and OneToOneField
+- Use `choices` for fields with limited options
+- Set `default` values where appropriate
+- Use `null=True, blank=True` for optional fields
+- Use `auto_now_add=True` for creation timestamps
+- Use `auto_now=True` for update timestamps
+
+## Django Views and API Views
+- Use class-based views (CBV) over function-based views when possible
+- Inherit from appropriate base classes (APIView, ViewSet, etc.)
+- Use proper HTTP status codes in responses
+- Implement proper error handling with try-except blocks
+- Use authentication_classes and permission_classes appropriately
+- Avoid using `@csrf_exempt` unless absolutely necessary
+- Use proper serializers for data validation and transformation
+
+## Django REST Framework
+- Use ViewSets for CRUD operations
+- Use Serializers for data validation and transformation
+- Implement proper pagination for list endpoints
+- Use appropriate HTTP methods (GET, POST, PUT, PATCH, DELETE)
+- Return consistent response formats
+- Use proper status codes (200, 201, 400, 401, 403, 404, 500)
+
+## URL Patterns
+- Use descriptive URL patterns with hyphens for readability
+- Group related URLs using include()
+- Use namespaced URLs when appropriate
+- Keep URL patterns consistent across the project
+- Use trailing slashes consistently
+
+## Security Best Practices
+- Never expose sensitive information in responses
+- Use environment variables for sensitive settings (SECRET_KEY, database credentials)
+- Implement proper authentication and authorization
+- Use HTTPS in production
+- Validate and sanitize all user inputs
+- Use Django's built-in security features (CSRF protection, XSS protection)
+- Implement rate limiting for API endpoints
+- Use secure password hashing (Django's default is good)
+
+## Database Best Practices
+- Use migrations for all database changes
+- Write meaningful migration names
+- Test migrations on development before production
+- Use database indexes for frequently queried fields
+- Avoid N+1 query problems by using select_related() and prefetch_related()
+- Use bulk operations when possible
+- Implement proper database constraints
+
+## Testing
+- Write tests for all models, views, and business logic
+- Use Django's TestCase for database tests
+- Use unittest.mock for mocking external services
+- Test both success and failure scenarios
+- Use factories or fixtures for test data
+- Aim for high test coverage (80%+)
+- Test API endpoints with proper authentication
+
+## Error Handling
+- Use proper exception handling with specific exception types
+- Log errors appropriately with different log levels
+- Return meaningful error messages to users
+- Don't expose internal error details in production
+- Use Django's built-in error handling where possible
+
+## Logging
+- Use Python's logging module
+- Configure different log levels for different environments
+- Log important business events
+- Don't log sensitive information
+- Use structured logging when possible
+
+## Performance
+- Use database indexes for frequently queried fields
+- Implement caching where appropriate
+- Use select_related() and prefetch_related() to avoid N+1 queries
+- Optimize database queries
+- Use bulk operations when possible
+- Monitor and profile performance
+
+## File Organization
+- Keep related code together
+- Use meaningful file and directory names
+- Separate concerns (models, views, serializers)
+- Use __init__.py files appropriately
+- Keep files focused and not too large
+
+## Dependencies
+- Keep requirements.txt up to date
+- Use specific versions for production dependencies
+- Regularly update dependencies for security patches
+- Document why each dependency is needed
+- Use virtual environments for development
+
+## Documentation
+- Write clear docstrings for all functions and classes
+- Document API endpoints with proper descriptions
+- Keep README.md up to date
+- Document deployment procedures
+- Document environment variables
+
+## Git and Version Control
+- Write meaningful commit messages
+- Use feature branches for new development
+- Keep commits focused and atomic
+- Use .gitignore appropriately
+- Don't commit sensitive information
+
+## Environment Configuration
+- Use python-decouple for environment variables
+- Keep different settings for different environments
+- Never commit .env files
+- Use environment-specific settings files when needed
+
+## API Design
+- Use consistent naming conventions for endpoints
+- Implement proper versioning strategy
+- Use appropriate HTTP methods
+- Return consistent response formats
+- Implement proper pagination
+- Use proper status codes
+
+## Specific to This Project
+- Use TokenAuthentication for API endpoints
+- Implement proper user authentication flow
+- Handle KYC (Know Your Customer) data securely
+- Implement proper wallet and transaction management
+- Use Cloudinary for file uploads
+- Implement proper notification system
+- Handle social media integrations securely
+
+## Code Review Guidelines
+- Review for security vulnerabilities
+- Check for performance issues
+- Ensure proper error handling
+- Verify test coverage
+- Check for code style compliance
+- Review for business logic correctness
+
+## Deployment
+- Use environment-specific settings
+- Configure proper logging
+- Set up monitoring and alerting
+- Use secure database connections
+- Implement proper backup strategies
+- Use HTTPS in production
+- Configure proper CORS settings
+
+## Monitoring and Maintenance
+- Monitor application performance
+- Set up error tracking
+- Monitor database performance
+- Keep dependencies updated
+- Regular security audits
+- Monitor API usage and rate limits 
