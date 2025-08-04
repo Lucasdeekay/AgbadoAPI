@@ -23,7 +23,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class GetUserNotificationsView(APIView):
     """
     Get all notifications for the authenticated user.
@@ -80,6 +80,7 @@ class GetUserNotificationsView(APIView):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
+
 class UpdateAllNotificationsReadStatusView(APIView):
     """
     Mark all notifications as read for the authenticated user.
@@ -87,6 +88,7 @@ class UpdateAllNotificationsReadStatusView(APIView):
     Updates the read status of all unread notifications for the user.
     """
     authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
@@ -126,6 +128,7 @@ class UpdateAllNotificationsReadStatusView(APIView):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
+
 class DeleteSingleNotificationView(APIView):
     """
     Delete a single notification.
@@ -179,6 +182,7 @@ class DeleteSingleNotificationView(APIView):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
+
 class DeleteMultipleNotificationsView(APIView):
     """
     Delete multiple notifications.
@@ -243,6 +247,7 @@ class DeleteMultipleNotificationsView(APIView):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
+
 class DeleteAllNotificationsView(APIView):
     """
     Delete all notifications for the authenticated user.

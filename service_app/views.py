@@ -15,6 +15,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 
 from auth_app.utils import upload_to_cloudinary
 from auth_app.views import get_user_from_token
@@ -29,7 +30,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class GetAllServicesDetailsView(APIView):
     """
     Get all services and details for a service provider.
@@ -38,7 +39,7 @@ class GetAllServicesDetailsView(APIView):
     reviews, and provider details.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes  = [IsAuthenticated]
 
     def get(self, request):
         """
@@ -108,7 +109,7 @@ class GetAllServicesDetailsView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class GetServiceDetailsView(APIView):
     """
     Get details of a specific service.
@@ -116,7 +117,7 @@ class GetServiceDetailsView(APIView):
     Retrieves service information and its associated subservices.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes  = [IsAuthenticated]
 
     def get(self, request, service_id):
         """
@@ -166,7 +167,7 @@ class GetServiceDetailsView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class GetSubServiceDetailsView(APIView):
     """
     Get details of a specific subservice.
@@ -174,7 +175,7 @@ class GetSubServiceDetailsView(APIView):
     Retrieves subservice information.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes  = [IsAuthenticated]
 
     def get(self, request, sub_service_id):
         """
@@ -208,7 +209,7 @@ class GetSubServiceDetailsView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class AddServiceView(APIView):
     """
     Add a new service.
@@ -216,7 +217,7 @@ class AddServiceView(APIView):
     Allows service providers to create new services.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes  = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -290,7 +291,7 @@ class AddServiceView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class AddSubServiceView(APIView):
     """
     Add a new subservice.
@@ -298,7 +299,7 @@ class AddSubServiceView(APIView):
     Allows service providers to create new subservices for existing services.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes  = [IsAuthenticated]
 
     def post(self, request, service_id):
         """
@@ -359,7 +360,7 @@ class AddSubServiceView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class EditServiceView(APIView):
     """
     Edit an existing service.
@@ -367,7 +368,7 @@ class EditServiceView(APIView):
     Allows service providers to update their services.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes  = [IsAuthenticated]
 
     def post(self, request, service_id):
         """
@@ -411,7 +412,7 @@ class EditServiceView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class EditSubServiceView(APIView):
     """
     Edit an existing subservice.
@@ -419,7 +420,7 @@ class EditSubServiceView(APIView):
     Allows service providers to update their subservices.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes  = [IsAuthenticated]
 
     def post(self, request, subservice_id):
         """
@@ -463,7 +464,7 @@ class EditSubServiceView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class ServiceProviderBookingsView(APIView):
     """
     Get all bookings for a service provider.
@@ -474,6 +475,12 @@ class ServiceProviderBookingsView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request, *args, **kwargs):
+        service_provider = get_user_from_token(request)  # Assuming the authenticated user is a service provider
+        bookings = Booking.objects.filter(service_provider=service_provider)
+        serializer = BookingSerializer(bookings, many=True)
+        return Response({'bookings': serializer.data})
+    
+
         """
         Get all bookings for a service provider.
         """
@@ -540,7 +547,7 @@ class ServiceProviderBidsView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class SubmitBidView(APIView):
     """
     Submit a bid for a service request.
@@ -630,7 +637,7 @@ class SubmitBidView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class CancelBookingView(APIView):
     """
     Cancel a booking.
@@ -676,7 +683,7 @@ class CancelBookingView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class CompleteBookingView(APIView):
     """
     Complete a booking.

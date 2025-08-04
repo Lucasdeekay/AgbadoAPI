@@ -25,7 +25,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class CreateServiceProviderView(APIView):
     """
     Create a new service provider profile.
@@ -118,7 +118,7 @@ class CreateServiceProviderView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class EditServiceProviderView(APIView):
     """
     Edit an existing service provider profile.
@@ -218,7 +218,6 @@ class EditServiceProviderView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class GetServiceProviderDetailsView(APIView):
     """
     Get service provider profile details.

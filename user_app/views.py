@@ -28,6 +28,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+
 class DashboardView(APIView):
     """
     Dashboard view for authenticated users.
@@ -92,6 +93,7 @@ class DashboardView(APIView):
         return Response(response_data, status=status.HTTP_200_OK)
 
 
+
 class GetKYCDetailsView(APIView):
     """
     Retrieve KYC details for the authenticated user.
@@ -125,6 +127,7 @@ class GetKYCDetailsView(APIView):
         
         except Exception as e:
             return Response({"message": f"Error fetching kyc details: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class UpdateUserProfileView(APIView):
     """
@@ -187,6 +190,7 @@ class UpdateUserProfileView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
 class UpdateKYCView(APIView):
     """
     Update KYC information for the authenticated user.
@@ -195,7 +199,7 @@ class UpdateKYCView(APIView):
     Supports partial updates of KYC information.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated] # Uncomment and set this up as needed
 
     def post(self, request):
         user = get_user_from_token(request)
@@ -254,6 +258,7 @@ class UpdateKYCView(APIView):
         else:
             # 8. If validation fails, return the errors from the serializer.
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class ChangePasswordView(APIView):
