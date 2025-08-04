@@ -5,13 +5,13 @@ from .views import DashboardView, GetKYCDetailsView, GetReferralCode, UpdateUser
 from .viewsets import DailyTaskViewSet, GiftViewSet, TaskCompletionViewSet, UserGiftViewSet, UserRewardViewSet, UserActivityViewSet, LeisureAccessViewSet
 
 router = DefaultRouter()
-router.register(r'tasks', DailyTaskViewSet)
-router.register(r'task-completions', TaskCompletionViewSet)
-router.register(r'rewards', UserRewardViewSet)
-router.register(r'user-activities', UserActivityViewSet)
-router.register(r'leisure', LeisureAccessViewSet)
-router.register(r'gifts', GiftViewSet)
-router.register(r'user-gifts', UserGiftViewSet)
+router.register(r'tasks', DailyTaskViewSet, basename='task')
+router.register(r'task-completions', TaskCompletionViewSet, basename='task-completion')
+router.register(r'rewards', UserRewardViewSet, basename='reward')
+router.register(r'user-activities', UserActivityViewSet, basename='user-activity')
+router.register(r'leisure', LeisureAccessViewSet, basename='leisure')
+router.register(r'gifts', GiftViewSet, basename='gift')
+router.register(r'user-gifts', UserGiftViewSet, basename='user-gift')
 
 
 urlpatterns = [

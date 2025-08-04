@@ -97,8 +97,6 @@ def delete_token(request):
     except (IndexError, ValueError):
         raise AuthenticationFailed('Invalid Authorization header format')
 
-
-@method_decorator(csrf_exempt, name='dispatch')
 class RegisterServiceProviderView(APIView):
     """
     Register a new service provider user.
@@ -178,21 +176,11 @@ class RegisterServiceProviderView(APIView):
                 }, status=status.HTTP_201_CREATED)
 
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        except IntegrityError:
-            return Response(
-                {"message": "A user with this information already exists."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        except Exception as e:
-            logger.error(f"Error registering service provider: {str(e)}")
-            return Response(
-                {"message": f"An error occurred during registration: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        except CustomUser.DoesNotExist:
+            return Response({"message": "User with the provided email or phone number does not exist."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class RegisterUserView(APIView):
     """
     Register a new regular user.
@@ -274,21 +262,11 @@ class RegisterUserView(APIView):
                 }, status=status.HTTP_201_CREATED)
 
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        except IntegrityError:
-            return Response(
-                {"message": "A user with this information already exists."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        except Exception as e:
-            logger.error(f"Error registering user: {str(e)}")
-            return Response(
-                {"message": f"An error occurred during registration: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        except CustomUser.DoesNotExist:
+            return Response({"message": "User with the provided email or phone number does not exist."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class SendOTPView(APIView):
     """
     Send OTP to user for verification.
@@ -335,19 +313,13 @@ class SendOTPView(APIView):
             )
 
         except CustomUser.DoesNotExist:
-            return Response(
-                {"message": "User with the provided email or phone number does not exist."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        except Exception as e:
-            logger.error(f"Error sending OTP to {identifier}: {str(e)}")
-            return Response(
-                {"message": f"An error occurred while sending OTP: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"message": "User with the provided email or phone number does not exist."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+        return Response({"message": "OTP successfully sent. You can now log in."}, status=status.HTTP_200_OK)
+
+
 class VerifyOTPView(APIView):
     """
     Verify OTP and activate user account.
@@ -545,14 +517,11 @@ class PinAuthView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         else:
-            logger.info(f"PIN authentication successful for user: {user.email}")
-            return Response(
-                {"message": "PIN authentication successful."}, 
-                status=status.HTTP_200_OK
-            )
+            return Response({"message": "PIN authentication successfully."}, status=status.HTTP_200_OK)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
+
 class LoginView(APIView):
     """
     Login user using email/phone and password.
@@ -591,25 +560,6 @@ class LoginView(APIView):
                 except CustomUser.DoesNotExist:
                     user = None
 
-            if user is not None:
-                login(request, user)
-                # Create and return token if credentials are valid
-                token, created = Token.objects.get_or_create(user=user)
-                
-                logger.info(f"User logged in successfully: {user.email}")
-                return Response({
-                    "token": token.key,
-                    "user": {
-                        "email": user.email,
-                        "phone_number": user.phone_number,
-                    }
-                })
-            else:
-                return Response(
-                    {"message": "Invalid credentials."}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
         except Exception as e:
             logger.error(f"Error during login: {str(e)}")
             return Response(
@@ -617,8 +567,22 @@ class LoginView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+        if user is not None:
+            login(request, user)
+            # Create and return token if credentials are valid
+            token, created = Token.objects.get_or_create(user=user)
+            return Response({
+                "token": token.key,
+                "user": {
+                    "email": user.email,
+                    "phone_number": user.phone_number,
+                }
+            })
+        else:
+            return Response({"message": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
 
-@method_decorator(csrf_exempt, name='dispatch')
+    
+
 class LogoutView(APIView):
     """
     Logout user and delete their token.
@@ -642,19 +606,9 @@ class LogoutView(APIView):
                 status=status.HTTP_200_OK
             )
         except AuthenticationFailed as e:
-            return Response(
-                {'detail': str(e)}, 
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        except Exception as e:
-            logger.error(f"Error during logout: {str(e)}")
-            return Response(
-                {"message": f"An error occurred during logout: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({'detail': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class ForgotPasswordView(APIView):
     """
     Request OTP for password reset.
@@ -702,26 +656,17 @@ class ForgotPasswordView(APIView):
             else:
                 send_otp_sms(user, otp)
 
-            logger.info(f"Password reset OTP sent to: {identifier}")
-            return Response(
-                {"message": "OTP sent to your email and phone number."}, 
-                status=status.HTTP_200_OK
-            )
-
-        except CustomUser.DoesNotExist:
-            return Response(
-                {"message": "User with the provided email or phone number does not exist."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
         except Exception as e:
-            logger.error(f"Error sending password reset OTP to {identifier}: {str(e)}")
+            logger.error(f"Error sending OTP to {identifier}: {str(e)}")
             return Response(
                 {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+        return Response({"message": "OTP sent to your email and phone number."}, status=status.HTTP_200_OK)
+
+
 class ResetPasswordView(APIView):
     """
     Reset password using OTP.
@@ -761,27 +706,16 @@ class ResetPasswordView(APIView):
                 title="Password Reset Successful", 
                 message="Your password has been successfully reset."
             )
-
-            logger.info(f"Password reset successfully for user: {user.email}")
-            return Response(
-                {"message": "Password has been successfully reset."}, 
-                status=status.HTTP_200_OK
-            )
-
-        except CustomUser.DoesNotExist:
-            return Response(
-                {"message": "User with the provided email or phone number does not exist."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
         except Exception as e:
             logger.error(f"Error resetting password: {str(e)}")
             return Response(
                 {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            )  
+
+        return Response({"message": "Password has been successfully reset."}, status=status.HTTP_200_OK)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class UpdateIsBusyView(APIView):
     """
     Update user's busy status.
@@ -815,7 +749,6 @@ class UpdateIsBusyView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class GoogleAppleAuthView(APIView):
     """
     Handle Google/Apple authentication.
@@ -879,7 +812,7 @@ class GoogleAppleAuthView(APIView):
 
 # --- WebAuthn (FIDO2) Biometric Authentication Views ---
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class StartWebAuthnRegistrationView(APIView):
     """
     Start WebAuthn registration process.
@@ -937,13 +870,9 @@ class StartWebAuthnRegistrationView(APIView):
 
         except Exception as e:
             logger.error(f"Error starting WebAuthn registration for user {user.email}: {e}")
-            return Response(
-                {"message": f"Failed to start WebAuthn registration: {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"message": f"Failed to start WebAuthn registration: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class CompleteWebAuthnRegistrationView(APIView):
     """
     Complete WebAuthn registration process.
@@ -1028,7 +957,7 @@ class CompleteWebAuthnRegistrationView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class StartWebAuthnAuthenticationView(APIView):
     """
     Start WebAuthn authentication process.
@@ -1098,7 +1027,7 @@ class StartWebAuthnAuthenticationView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+
 class CompleteWebAuthnAuthenticationView(APIView):
     """
     Complete WebAuthn authentication process.
@@ -1187,13 +1116,9 @@ class CompleteWebAuthnAuthenticationView(APIView):
             )
         except Exception as e:
             logger.error(f"Unexpected error completing WebAuthn authentication for user {user.email}: {e}")
-            return Response(
-                {"message": f"An unexpected error occurred: {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class DeleteWebAuthnCredentialView(APIView):
     """
     Delete WebAuthn credential.
@@ -1236,14 +1161,9 @@ class DeleteWebAuthnCredentialView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         except Exception as e:
-            logger.error(f"Error deleting WebAuthn credential: {str(e)}")
-            return Response(
-                {"message": f"An unexpected error occurred: {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class ListWebAuthnCredentialsView(APIView):
     """
     List user's WebAuthn credentials.
@@ -1264,28 +1184,21 @@ class ListWebAuthnCredentialsView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        try:
-            credentials = WebAuthnCredential.objects.filter(user=user).order_by('-registered_at')
-            data = [
-                {
-                    "id": cred.id,
-                    "credential_id_short": cred.credential_id[:10] + "...",
-                    "registered_at": cred.registered_at.isoformat(),
-                    "last_used": cred.last_used.isoformat() if cred.last_used else None,
-                    "transports": cred.transports,
-                    "sign_count": cred.sign_count
-                } for cred in credentials
-            ]
-            return Response({"credentials": data}, status=status.HTTP_200_OK)
-        except Exception as e:
-            logger.error(f"Error listing WebAuthn credentials for user {user.email}: {str(e)}")
-            return Response(
-                {"message": f"An error occurred: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        credentials = WebAuthnCredential.objects.filter(user=user).order_by('-registered_at')
+        data = [
+            {
+                "id": cred.id,
+                "credential_id_short": cred.credential_id[:10] + "...", # Shorten for display
+                "registered_at": cred.registered_at.isoformat(),
+                "last_used": cred.last_used.isoformat() if cred.last_used else None,
+                "transports": cred.transports,
+                "sign_count": cred.sign_count
+            } for cred in credentials
+        ]
+        return Response({"credentials": data}, status=status.HTTP_200_OK)
 
+# New view for deleting a user account
 
-@method_decorator(csrf_exempt, name='dispatch')
 class DeleteAccountView(APIView):
     """
     Delete user account.

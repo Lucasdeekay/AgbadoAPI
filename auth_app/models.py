@@ -289,6 +289,8 @@ class OTP(models.Model):
         help_text="When the OTP was created"
     )
     expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
         help_text="When the OTP expires"
     )
     is_used = models.BooleanField(

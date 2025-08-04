@@ -6,8 +6,8 @@ from .views import CancelBookingView, CompleteBookingView, GetSubServiceDetailsV
 from .viewsets import ServiceViewSet, SubServiceViewSet, ServiceRequestViewSet, ServiceRequestBidViewSet, BookingViewSet
 
 router = DefaultRouter()
-router.register(r'services', ServiceViewSet)
-router.register(r'sub-services', SubServiceViewSet)
+router.register(r'services', ServiceViewSet, basename='service')
+router.register(r'sub-services', SubServiceViewSet, basename='sub-service')
 router.register(r'service-requests', ServiceRequestViewSet, basename='service-request')
 router.register(r'service-request-bids', ServiceRequestBidViewSet, basename='service-request-bid')
 router.register(r'bookings', BookingViewSet, basename='booking')

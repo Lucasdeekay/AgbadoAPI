@@ -6,10 +6,10 @@ from .views import CompleteWebAuthnAuthenticationView, CompleteWebAuthnRegistrat
 from .viewsets import UserViewSet, KYCViewSet, OTPViewSet, ReferralViewSet
 
 router = DefaultRouter()
-router.register(r'users', UserViewSet)
-router.register(r'kyc', KYCViewSet)
-router.register(r'otp', OTPViewSet)
-router.register(r'referral', ReferralViewSet)
+router.register(r'users', UserViewSet, basename='user')
+router.register(r'kyc', KYCViewSet, basename='kyc')
+router.register(r'otp', OTPViewSet, basename='otp')
+router.register(r'referral', ReferralViewSet, basename='referral')
 
 urlpatterns = [
     path('register/service-provider/', RegisterServiceProviderView.as_view(), name='register-service-provider'),

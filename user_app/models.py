@@ -198,6 +198,11 @@ class Gift(models.Model):
         max_length=255,
         help_text="Name of the gift"
     )
+    description = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Detailed description of the gift"
+    )
     image = models.ImageField(
         upload_to='gifts/',
         help_text="Gift image"
@@ -205,6 +210,10 @@ class Gift(models.Model):
     coin_amount = models.PositiveIntegerField(
         validators=[MinValueValidator(1)],
         help_text="Points required to claim this gift"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this gift is currently available"
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

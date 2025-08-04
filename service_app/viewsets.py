@@ -106,7 +106,7 @@ class ServiceRequestViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter)
     filterset_fields = ['category', 'status', 'user']
     search_fields = ['title', 'description', 'category']
-    ordering_fields = ['created_at', 'title', 'budget']
+    ordering_fields = ['created_at', 'title', 'price']
     ordering = ['-created_at']
     permission_classes = [IsAuthenticated]
 
