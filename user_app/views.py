@@ -20,7 +20,7 @@ from decouple import config
 from auth_app.utils import upload_to_cloudinary
 from auth_app.views import get_user_from_token
 from notification_app.models import Notification
-from service_provider_app.models import ServiceProvider
+from provider_app.models import ServiceProvider
 from wallet_app.models import Wallet, Transaction
 from wallet_app.serializers import TransactionSerializer
 
