@@ -20,6 +20,7 @@ from decouple import config
 from auth_app.utils import upload_to_cloudinary
 from auth_app.views import get_user_from_token
 from notification_app.models import Notification
+from service_provider_app.models import ServiceProvider
 from wallet_app.models import Wallet, Transaction
 from wallet_app.serializers import TransactionSerializer
 
@@ -82,12 +83,30 @@ class DashboardView(APIView):
         except Exception as e:
             has_unread_notifications = False
 
+        try:
+            has_business_profile = ServiceProvider.objects.filter(user=user).exists()
+        except Exception as e:
+            has_business_profile = False
+
+        # Check if user profile is complete
+        required_fields = [
+            user.first_name,
+            user.last_name,
+            user.email,
+            user.phone_number,
+            user.state,
+            user.profile_picture
+        ]
+        is_profile_complete = all(bool(field) for field in required_fields)
+
             # Combine data into response
         response_data = {
             "user_details": user_data,
             "wallet_details": wallet_data,
             "recent_transactions": transactions_data,
             "has_unread_notifications": has_unread_notifications,
+            "has_business_profile": has_business_profile,
+            "is_profile_complete": is_profile_complete,
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
