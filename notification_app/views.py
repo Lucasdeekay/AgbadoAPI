@@ -31,7 +31,7 @@ class GetUserNotificationsView(APIView):
     Retrieves all notifications for the user and marks them as read.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request):
         """
@@ -88,8 +88,7 @@ class UpdateAllNotificationsReadStatusView(APIView):
     Updates the read status of all unread notifications for the user.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def patch(self, request):
         """
@@ -136,7 +135,7 @@ class DeleteSingleNotificationView(APIView):
     Allows users to delete a specific notification by ID.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
         """
@@ -190,7 +189,7 @@ class DeleteMultipleNotificationsView(APIView):
     Allows users to delete multiple notifications by providing a list of IDs.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -255,7 +254,7 @@ class DeleteAllNotificationsView(APIView):
     Removes all notifications belonging to the user.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def delete(self, request):
         """

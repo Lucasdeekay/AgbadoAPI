@@ -81,7 +81,7 @@ class GetWalletBalanceView(APIView):
     Retrieves current wallet balance and account information.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request):
         """
@@ -140,7 +140,7 @@ class GetTransactionHistoryView(APIView):
     Retrieves paginated transaction history with filtering options.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request):
         """
@@ -227,7 +227,7 @@ class GetWithdrawalHistoryView(APIView):
     Retrieves paginated withdrawal history with filtering options.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request):
         """
@@ -314,7 +314,7 @@ class GetBanksListView(APIView):
     Retrieves all active banks that can be used for withdrawals.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request):
         """
@@ -352,7 +352,7 @@ class GetBanksListView(APIView):
 # 1. View to return wallet details and last 5 transactions
 class WalletDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated] # Enable permission
+    # permission_classes = [IsAuthenticated] # Enable permission
 
     def get(self, request):
         try:
@@ -382,7 +382,7 @@ class WalletDetailsView(APIView):
 # 2. View to return all transactions for the user
 class AllTransactionsView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated] # Enable permission
+    # permission_classes = [IsAuthenticated] # Enable permission
 
     def get(self, request):
         try:
@@ -402,7 +402,7 @@ class AllTransactionsView(APIView):
 
 class TransactionDetailView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated] # Enable permission
+    # permission_classes = [IsAuthenticated] # Enable permission
 
     def get(self, request, pk): # Use 'pk' (primary key) for detail view conventions
         try:
@@ -432,7 +432,7 @@ class TransactionDetailView(APIView):
 
 class WithdrawalRequestView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated] # Enable permission
+    # permission_classes = [IsAuthenticated] # Enable permission
 
     def post(self, request):
         user = get_user_from_token(request)

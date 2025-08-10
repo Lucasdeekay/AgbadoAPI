@@ -33,7 +33,7 @@ class CreateServiceProviderView(APIView):
     Allows users to create their service provider profile with company details.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -126,7 +126,7 @@ class EditServiceProviderView(APIView):
     Allows users to update their service provider profile details.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -225,7 +225,7 @@ class GetServiceProviderDetailsView(APIView):
     Retrieves the service provider profile for the authenticated user.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request):
         """

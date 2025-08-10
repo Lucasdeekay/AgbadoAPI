@@ -38,7 +38,7 @@ class DashboardView(APIView):
     and notification status.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
@@ -121,7 +121,7 @@ class GetKYCDetailsView(APIView):
     and document details.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request):
         # Fetch user details
@@ -156,7 +156,7 @@ class UpdateUserProfileView(APIView):
     Creates a notification when profile is successfully updated.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user = get_user_from_token(request)
@@ -218,7 +218,7 @@ class UpdateKYCView(APIView):
     Supports partial updates of KYC information.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated] # Uncomment and set this up as needed
+    # permission_classes = [IsAuthenticated] # Uncomment and set this up as needed
 
     def post(self, request):
         user = get_user_from_token(request)
@@ -288,7 +288,7 @@ class ChangePasswordView(APIView):
     Validates old password before allowing the change.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -329,7 +329,7 @@ class GetReferralCode(APIView):
     Returns the unique referral code for the authenticated user.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = get_user_from_token(request)
