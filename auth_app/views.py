@@ -400,7 +400,7 @@ class PinRegistrationView(APIView):
     Allows users to set a 6-digit PIN for additional security.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -447,7 +447,7 @@ class PinUpdateView(APIView):
     Allows users to change their existing PIN.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def put(self, request):
         """
@@ -494,7 +494,7 @@ class PinAuthView(APIView):
     Verifies the user's PIN for additional security.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -724,7 +724,7 @@ class UpdateIsBusyView(APIView):
     Toggles the is_busy field for the authenticated user.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def put(self, request):
         """
@@ -821,7 +821,7 @@ class StartWebAuthnRegistrationView(APIView):
     Generates registration options for biometric authentication setup.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -881,7 +881,7 @@ class CompleteWebAuthnRegistrationView(APIView):
     Verifies the registration response and saves the credential.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -1127,7 +1127,7 @@ class DeleteWebAuthnCredentialView(APIView):
     Allows users to remove their biometric authentication credentials.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
         """
@@ -1172,7 +1172,7 @@ class ListWebAuthnCredentialsView(APIView):
     Returns all biometric authentication credentials for the user.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         """
@@ -1207,7 +1207,7 @@ class DeleteAccountView(APIView):
     Permanently deletes the authenticated user's account and all associated data.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def delete(self, request):
         """

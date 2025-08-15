@@ -39,7 +39,7 @@ class GetAllServicesDetailsView(APIView):
     reviews, and provider details.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         """
@@ -117,7 +117,7 @@ class GetServiceDetailsView(APIView):
     Retrieves service information and its associated subservices.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, service_id):
         """
@@ -175,7 +175,7 @@ class GetSubServiceDetailsView(APIView):
     Retrieves subservice information.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, sub_service_id):
         """
@@ -217,7 +217,7 @@ class AddServiceView(APIView):
     Allows service providers to create new services.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -299,7 +299,7 @@ class AddSubServiceView(APIView):
     Allows service providers to create new subservices for existing services.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, service_id):
         """
@@ -368,7 +368,7 @@ class EditServiceView(APIView):
     Allows service providers to update their services.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, service_id):
         """
@@ -420,7 +420,7 @@ class EditSubServiceView(APIView):
     Allows service providers to update their subservices.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, subservice_id):
         """
@@ -472,7 +472,7 @@ class ServiceProviderBookingsView(APIView):
     Retrieves all bookings associated with the service provider.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, *args, **kwargs):
         service_provider = get_user_from_token(request)  # Assuming the authenticated user is a service provider
@@ -508,7 +508,7 @@ class ServiceProviderBidsView(APIView):
     Retrieves service requests in the provider's category and their bids.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, *args, **kwargs):
         """
@@ -555,7 +555,7 @@ class SubmitBidView(APIView):
     Allows service providers to submit or update bids for service requests.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     
     def post(self, request, service_request_id, *args, **kwargs):
         """
@@ -645,7 +645,7 @@ class CancelBookingView(APIView):
     Allows service providers to cancel bookings.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     
     def post(self, request, booking_id, *args, **kwargs):
         """
@@ -691,7 +691,7 @@ class CompleteBookingView(APIView):
     Allows service providers to mark bookings as completed.
     """
     authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     
     def post(self, request, booking_id, *args, **kwargs):
         """
