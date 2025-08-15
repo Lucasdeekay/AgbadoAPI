@@ -573,7 +573,7 @@ class LoginView(APIView):
             token, created = Token.objects.get_or_create(user=user)
             return Response({
                 "token": token.key,
-                "has_pin": True if user.pin != "" else False,
+                "has_pin": bool(user.pin),
                 "user": {
                     "email": user.email,
                     "phone_number": user.phone_number,
