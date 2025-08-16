@@ -1,271 +1,327 @@
 """
-- Authentication
-- Creating reserved accounts
-- Fetching account details
-- Validating transactions
-- Initiating disbursements
-- Checking disbursement status
+monnify_service.py
+----------------------------
+High-level helper library for Monnify **reserved (dedicated) accounts**.
 
----
+Features
+--------
+1. Create & fetch dedicated accounts
+2. Receive deposits (webhook) & expose balance
+3. Withdraw from the account (Monnify disbursement)
+4. Query transaction history
+5. Thin wallet abstraction (crud operations)
 
-*🐍 MonnifyService Class (Python)*
+Author : PappyCoder
+Date   : 2024-08-16
 """
-# monnify_service.py
-import requests
-import base64
-import hashlib
 
-class MonnifyService:
-    def __init__(self, api_key, secret_key, contract_code, base_url=None):
-        self.api_key = api_key
-        self.secret_key = secret_key
+from __future__ import annotations
+
+import datetime as _dt
+import uuid
+from typing import Dict, List, Optional
+
+from monnify import Monnify  # our low-level client
+
+# --------------------------------------------------------------------------- #
+#                               Exceptions                                    #
+# --------------------------------------------------------------------------- #
+class DedicatedAccountError(RuntimeError):
+    """Raised when any dedicated-account operation fails."""
+
+
+# --------------------------------------------------------------------------- #
+#                            Wallet / Account DTOs                            #
+# --------------------------------------------------------------------------- #
+class DedicatedAccount:
+    """Simple in-memory representation of a reserved account."""
+
+    def __init__(
+        self,
+        account_reference: str,
+        account_name: str,
+        customer_email: str,
+        contract_code: str,
+        account_number: str,
+        bank_name: str,
+        bank_code: str,
+        bvn: str | None = None,
+        nin: str | None = None,
+    ):
+        self.account_reference = account_reference
+        self.account_name = account_name
+        self.customer_email = customer_email
         self.contract_code = contract_code
-        self.base_url = base_url or "https://api.monnify.com/api/v1"
-        self.access_token = None
+        self.account_number = account_number
+        self.bank_name = bank_name
+        self.bank_code = bank_code
+        self.bvn = bvn
+        self.nin = nin
 
-    def authenticate(self):
-        """
-        Authenticate with Monnify API and store access token.
-        """
-        auth_string = f"{self.api_key}:{self.secret_key}"
-        encoded_auth = base64.b64encode(auth_string.encode()).decode()
+    def to_dict(self) -> Dict:
+        return self.__dict__
 
-        headers = {
-            "Authorization": f"Basic {encoded_auth}"
-}
+    @classmethod
+    def from_dict(cls, data: Dict) -> "DedicatedAccount":
+        return cls(**data)
 
-        response = requests.post(f"{self.base_url}/auth/login", headers=headers)
-        response.raise_for_status()
-        self.access_token = response.json()['responseBody']['accessToken']
-        return self.access_token
 
-    def _get_headers(self):
+class Wallet:
+    """Thin wallet abstraction (Monnify wallet that funds withdrawals)."""
+
+    def __init__(
+        self,
+        account_number: str,
+        available_balance: float,
+        ledger_balance: float,
+    ):
+        self.account_number = account_number
+        self.available_balance = available_balance
+        self.ledger_balance = ledger_balance
+
+
+# --------------------------------------------------------------------------- #
+#                          DedicatedAccountService                            #
+# --------------------------------------------------------------------------- #
+class DedicatedAccountService:
+    """
+    High-level facade around Monnify reserved-account operations.
+    """
+
+    def __init__(self, api_key: str, secret: str, sandbox: bool = True):
+        self._client = Monnify(api_key, secret, sandbox)
+        self._token: str | None = None
+
+    # ------------- #
+    #   INTERNAL    #
+    # ------------- #
+    def _ensure_token(self) -> str:
+        if not self._token:
+            resp = self._client.auth_login()
+            self._token = resp["responseBody"]["accessToken"]
+        return self._token
+
+    # ------------- #
+    #   ACCOUNTS    #
+    # ------------- #
+    def create_account(
+        self,
+        *,
+        account_name: str,
+        customer_email: str,
+        customer_name: str,
+        contract_code: str,
+        bvn: str | None = None,
+        nin: str | None = None,
+        income_split_config: List[Dict] | None = None,
+    ) -> DedicatedAccount:
         """
-        Helper method to return headers with Bearer token.
+        Create a new reserved account.
+
+        Returns
+        -------
+        DedicatedAccount instance with populated account_number & bank details.
         """
-        if not self.access_token:
-            self.authenticate()
+        account_ref = str(uuid.uuid4())
+        token = self._ensure_token()
+        resp = self._client.reserved_account_create(
+            token,
+            account_reference=account_ref,
+            account_name=account_name,
+            customer_email=customer_email,
+            contract_code=contract_code,
+            bvn=bvn,
+            nin=nin,
+            income_split_config=income_split_config,
+        )
+        body = resp["responseBody"]
+        bank = body["accounts"][0]  # Monnify always returns ≥1 bank
+        return DedicatedAccount(
+            account_reference=account_ref,
+            account_name=account_name,
+            customer_email=customer_email,
+            contract_code=contract_code,
+            account_number=bank["accountNumber"],
+            bank_name=bank["bankName"],
+            bank_code=bank["bankCode"],
+            bvn=bvn,
+            nin=nin,
+        )
+
+    def get_account(self, account_reference: str) -> DedicatedAccount:
+        """
+        Fetch account details from Monnify.
+        """
+        token = self._ensure_token()
+        resp = self._client.reserved_account_details(token, account_reference=account_reference)
+        body = resp["responseBody"]
+        bank = body["accounts"][0]
+        return DedicatedAccount(
+            account_reference=account_reference,
+            account_name=body["accountName"],
+            customer_email=body["customerEmail"],
+            contract_code=body["contractCode"],
+            account_number=bank["accountNumber"],
+            bank_name=bank["bankName"],
+            bank_code=bank["bankCode"],
+        )
+
+    # ------------- #
+    #   DEPOSITS    #
+    # ------------- #
+    def deposit_webhook(self, payload: Dict) -> Dict:
+        """
+        Validate and parse a Monnify webhook payload.
+
+        Example payload (trimmed):
+        {
+          "eventType": "SUCCESSFUL_TRANSACTION",
+          "eventData": {
+              "paymentReference": "...",
+              "amountPaid": 1000,
+              "accountNumber": "5000123456"
+          }
+        }
+
+        Returns
+        -------
+        Dict with keys: account_number, amount, payment_reference, paid_at
+        """
+        if payload.get("eventType") != "SUCCESSFUL_TRANSACTION":
+            raise DedicatedAccountError("Unsupported webhook event")
+
+        data = payload["eventData"]
         return {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json"
-}
+            "account_number": data["accountNumber"],
+            "amount": float(data["amountPaid"]),
+            "payment_reference": data["paymentReference"],
+            "paid_at": data.get("paidOn", _dt.datetime.utcnow().isoformat()),
+        }
 
-    def create_reserved_account(self, customer):
+    # ------------- #
+    #   WITHDRAWAL  #
+    # ------------- #
+    def withdraw(
+        self,
+        *,
+        source_account: str,
+        destination_account: str,
+        destination_bank_code: str,
+        amount: float,
+        narration: str = "Withdrawal from dedicated account",
+    ) -> str:
         """
-        Create a reserved virtual account for a unique customer.
+        Withdraw money **from** the wallet account (source_account)
+        **to** the external bank account (destination_account).
 
-:param customer: dict with keys 'reference', 'name', 'email'
-:return: dict with account details
+        Returns
+        -------
+        Monnify transaction reference (str)
         """
-        payload = {
-            "accountReference": customer['reference'],
-            "accountName": customer['name'],
-            "customerEmail": customer['email'],
-            "customerName": customer['name'],
-            "contractCode": self.contract_code,
-            "currencyCode": "NGN",
-            "getAllAvailableBanks": True
-}
+        token = self._ensure_token()
+        reference = str(uuid.uuid4())
+        resp = self._client.disburse_single(
+            token,
+            amount=amount,
+            reference=reference,
+            narration=narration,
+            destination_bank_code=destination_bank_code,
+            destination_account_number=destination_account,
+            source_account_number=source_account,
+        )
+        return resp["responseBody"]["transactionReference"]
 
-        response = requests.post(
-            f"{self.base_url}/bank-transfer/reserved-accounts",
-            json=payload,
-            headers=self._get_headers()
-)
-        response.raise_for_status()
-        return response.json()['responseBody']
-
-    def get_reserved_account_details(self, account_reference):
+    # ------------- #
+    #   WALLET      #
+    # ------------- #
+    def wallet_balance(self, wallet_account: str) -> Wallet:
         """
-        Fetch details of a reserved account by reference.
-
-:param account_reference: str
-:return: dict with account details
+        Get real-time balance of the Monnify **wallet account**.
+        (This is *not* the reserved account balance – Monnify doesn’t expose it.)
         """
-        response = requests.get(
-            f"{self.base_url}/bank-transfer/reserved-accounts/{account_reference}",
-            headers=self._get_headers()
-)
-        response.raise_for_status()
-        return response.json()['responseBody']
+        token = self._ensure_token()
+        resp = self._client.wallet_balance(token, account_number=wallet_account)
+        body = resp["responseBody"]
+        return Wallet(
+            account_number=wallet_account,
+            available_balance=body["availableBalance"],
+            ledger_balance=body["ledgerBalance"],
+        )
 
-    def validate_transaction(self, transaction_reference):
+    # ------------- #
+    #   HISTORY     #
+    # ------------- #
+    def transactions(
+        self,
+        account_reference: str,
+        *,
+        page: int = 0,
+        size: int = 10,
+    ) -> List[Dict]:
         """
-        Validate a transaction using its reference.
-
-:param transaction_reference: str
-:return: dict with transaction details
+        Get paginated list of deposits made **into** the reserved account.
+        Each Dict contains:
+        - transaction_reference
+        - amount
+        - payment_reference
+        - payment_status
+        - paid_on
         """
-        response = requests.get(
-            f"{self.base_url}/transactions/{transaction_reference}",
-            headers=self._get_headers()
-)
-        response.raise_for_status()
-        return response.json()['responseBody']
-
-    def initiate_disbursement(self, disbursement):
-        """
-        Initiate a disbursement (withdrawal) to a bank account.
-
-:param disbursement: dict with keys 'amount', 'reference', 'narration', 'bankCode', 'accountNumber', 'walletId'
-:return: dict with disbursement response
-        """
-        response = requests.post(
-            f"{self.base_url}/disbursements/single",
-            json=disbursement,
-            headers=self._get_headers()
-)
-        response.raise_for_status()
-        return response.json()['responseBody']
-
-    def check_disbursement_status(self, reference):
-        """
-        Check the status of a disbursement.
-
-:param reference: str
-:return: dict with disbursement status
-        """
-        response = requests.get(
-            f"{self.base_url}/disbursements/single/{reference}",
-            headers=self._get_headers()
-)
-        response.raise_for_status()
-        return response.json()['responseBody']
+        token = self._ensure_token()
+        resp = self._client.reserved_account_transactions(
+            token,
+            account_reference=account_reference,
+            page=page,
+            size=size,
+        )
+        content = resp["responseBody"]["content"]
+        return [
+            {
+                "transaction_reference": tx["transactionReference"],
+                "amount": tx["amount"],
+                "payment_reference": tx["paymentReference"],
+                "payment_status": tx["paymentStatus"],
+                "paid_on": tx["completedOn"],
+            }
+            for tx in content
+        ]
 
 
-    def verify_webhook_signature(transaction_reference, payment_reference, amount_paid, paid_on, transaction_hash, secret_key):
-    """
-    Verify Monnify webhook signature.
+# --------------------------------------------------------------------------- #
+#                               USAGE EXAMPLE                                 #
+# --------------------------------------------------------------------------- #
+if __name__ == "__main__":
+    import os
 
-:param transaction_reference: str
-:param payment_reference: str
-:param amount_paid: str or float
-:param paid_on: str (ISO timestamp)
-:param transaction_hash: str (from webhook)
-:param secret_key: str (your Monnify secret key)
-:return: bool
-    """
-    raw_string = f"{transaction_reference}|{payment_reference}|{amount_paid}|{paid_on}|{secret_key}"
-    computed_hash = hashlib.sha512(raw_string.encode()).hexdigest()
-    return computed_hash == transaction_hash
+    svc = DedicatedAccountService(
+        api_key=os.getenv("MONNIFY_API_KEY"),
+        secret=os.getenv("MONNIFY_SECRET"),
+        sandbox=True,
+    )
 
-    def create_invoice(self, invoice):
-    """
-    Create a payment invoice.
+    # 1. Create account
+    acc = svc.create_account(
+        account_name="Ada Lovelace",
+        customer_email="ada@example.com",
+        customer_name="Ada Lovelace",
+        contract_code="100693167467",
+        bvn="21212121212",
+    )
+    print("Created =>", acc.to_dict())
 
-:param invoice: dict with keys 'amount', 'customerName', 'customerEmail', 'paymentReference', 'description', 'redirectUrl'
-:return: dict with invoice details
-    """
-    payload = {
-        "amount": invoice['amount'],
-        "customerName": invoice['customerName'],
-        "customerEmail": invoice['customerEmail'],
-        "paymentReference": invoice['paymentReference'],
-        "paymentDescription": invoice['description'],
-        "currencyCode": "NGN",
-        "contractCode": self.contract_code,
-        "redirectUrl": invoice['redirectUrl']
-}
+    # 2. Wallet balance (the pool that funds withdrawals)
+    wallet = svc.wallet_balance("3934178936")
+    print("Wallet balance =>", wallet.available_balance)
 
-    response = requests.post(
-        f"{self.base_url}/merchant-invoices/create",
-        json=payload,
-        headers=self._get_headers()
-)
-    response.raise_for_status()
-    return response.json()['responseBody']
+    # 3. Withdraw ₦1 000 from wallet → external GTBank account
+    tx_ref = svc.withdraw(
+        source_account=wallet.account_number,
+        destination_account="0111946768",
+        destination_bank_code="058",
+        amount=1000,
+    )
+    print("Withdrawal reference =>", tx_ref)
 
-  def get_invoice_details(self, payment_reference):
-    """
-    Retrieve invoice details by payment reference.
-
-:param payment_reference: str
-:return: dict with invoice details
-    """
-    response = requests.get(
-        f"{self.base_url}/merchant-invoices/query?paymentReference={payment_reference}",
-        headers=self._get_headers()
-)
-    response.raise_for_status()
-    return response.json()['responseBody']
-
-  def list_transactions(self, page=0, size=10):
-    """
-    List transactions with pagination.
-
-:param page: int
-:param size: int
-:return: dict with transaction list
-    """
-    response = requests.get(
-        f"{self.base_url}/transactions/search?page={page}&size={size}",
-        headers=self._get_headers()
-)
-    response.raise_for_status()
-    return response.json()['responseBody']
-
-  def get_transaction_details(self, transaction_reference):
-    """
-    Get full details of a transaction.
-
-:param transaction_reference: str
-:return: dict with transaction info
-    """
-    response = requests.get(
-        f"{self.base_url}/transactions/{transaction_reference}",
-        headers=self._get_headers()
-)
-    response.raise_for_status()
-    return response.json()['responseBody']
-
-  def get_wallet_balance(self, wallet_id="defaultWallet"):
-    """
-    Get the balance of a Monnify wallet.
-
-:param wallet_id: str (default is 'defaultWallet')
-:return: dict with wallet balance
-    """
-    response = requests.get(
-        f"{self.base_url}/disbursements/wallet-balance/{wallet_id}",
-        headers=self._get_headers()
-)
-    response.raise_for_status()
-    return response.json()['responseBody']
-
-
-    def list_wallet_transactions(self, wallet_id="defaultWallet", page=0, size=10):
-    """
-    List transactions from a Monnify wallet.
-
-:param wallet_id: str
-:param page: int
-:param size: int
-:return: dict with transaction list
-    """
-    response = requests.get(
-        f"{self.base_url}/disbursements/wallet-transactions/{wallet_id}?page={page}&size={size}",
-        headers=self._get_headers()
-)
-    response.raise_for_status()
-    return response.json()['responseBody']
-
-"""
-Example usage
-
-from monnify_service import MonnifyService
-
-monnify = MonnifyService(
-    api_key="YOUR_API_KEY",
-    secret_key="YOUR_SECRET_KEY",
-    contract_code="YOUR_CONTRACT_CODE"
-)
-
-# Create a reserved account
-account = monnify.create_reserved_account({
-    "reference": "user123",
-    "name": "Jane Doe",
-    "email": "jane@example.com"
-})
-
-print("Reserved Account:", account)
-"""
+    # 4. Deposit history (webhook already processed)
+    txs = svc.transactions(acc.account_reference)
+    print("Transactions =>", txs)
