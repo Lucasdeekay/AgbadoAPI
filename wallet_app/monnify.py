@@ -644,6 +644,24 @@ class Monnify:
             headers=self._bearer_header(token),
             json={},
         )
+    
+    def reserved_account_update_bvn(
+        self,
+        token: str,
+        *,
+        account_reference: str,
+        bvn: str,
+    ) -> dict:
+        """
+        Link/overwrite the BVN on an existing reserved account.
+        """
+        ref = _urlparse.quote(account_reference)
+        return self._request(
+            "PUT",
+            f"/api/v1/bank-transfer/reserved-accounts/{ref}/kyc-info",
+            headers=self._bearer_header(token),
+            json={"bvn": bvn},
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -652,9 +670,9 @@ class Monnify:
 if __name__ == "__main__":
     # Quick sanity test (requires env vars)
     api_key = os.getenv("MONNIFY_API_KEY")
-    secret = os.getenv("MONNIFY_SECRET")
+    secret = os.getenv("MONNIFY_SECRET_KEY")
     if not (api_key and secret):
-        raise SystemExit("Set MONNIFY_API_KEY & MONNIFY_SECRET env vars first!")
+        raise SystemExit("Set MONNIFY_API_KEY & MONNIFY_SECRET_KEY env vars first!")
 
     api = Monnify(api_key, secret, sandbox=True)
     token = api.auth_login()["responseBody"]["accessToken"]

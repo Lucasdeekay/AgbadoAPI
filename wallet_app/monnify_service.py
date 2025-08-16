@@ -285,6 +285,43 @@ class DedicatedAccountService:
             }
             for tx in content
         ]
+    
+        # ------------- #
+    #   UPDATE BVN  #
+    # ------------- #
+    def update_bvn_on_reserved_account(
+        self,
+        *,
+        account_reference: str,
+        bvn: str,
+    ) -> None:
+        """
+        Link/overwrite the BVN on an existing Monnify reserved account.
+
+        Parameters
+        ----------
+        account_reference : str
+            The unique account reference returned when the account was created.
+        bvn : str
+            The 11-digit Bank Verification Number to link.
+
+        Raises
+        ------
+        DedicatedAccountError
+            If the API call fails.
+        """
+        if len(str(bvn)) != 11:
+            raise DedicatedAccountError("BVN must be exactly 11 digits.")
+
+        token = self._ensure_token()
+        try:
+            self._client.reserved_account_update_bvn(
+                token,
+                account_reference=account_reference,
+                bvn=bvn,
+            )
+        except Exception as exc:
+            raise DedicatedAccountError(f"Failed to update BVN: {exc}")
 
 
 # --------------------------------------------------------------------------- #
@@ -295,7 +332,7 @@ class DedicatedAccountService:
 
 #     svc = DedicatedAccountService(
 #         api_key=os.getenv("MONNIFY_API_KEY"),
-#         secret=os.getenv("MONNIFY_SECRET"),
+#         secret=os.getenv("MONNIFY_SECRET_KEY"),
 #         sandbox=True,
 #     )
 

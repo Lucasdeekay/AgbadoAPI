@@ -5,10 +5,9 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     WalletDetailsView,
     AllTransactionsView,
-    TransactionDetailView,
     WithdrawalRequestView,
-    PaystackWebhookView,
-    # DepositView is removed as DVA deposits are webhook-driven
+    TransactionDetailView,
+    MonnifyWebhookView,
 )
 
 # Import your ViewSet classes
@@ -73,7 +72,7 @@ urlpatterns = [
     # This is where Paystack will send notifications for deposit successes, transfer failures, etc.
     # This MUST be csrf_exempt. Ensure it's not authenticated with TokenAuthentication.
     # from .views import PaystackWebhookView # Assuming you create this view
-    path('paystack/webhook/', PaystackWebhookView.as_view(), name='paystack-webhook'),
+    path('webhook/monnify/', MonnifyWebhookView.as_view(), name='monnify-webhook'),
 
     # If you still want a direct endpoint for authenticated user's wallet summary (e.g., /my-wallet/)
     # and prefer it separate from the ViewSet's /api/wallets/my-wallet/, keep this:

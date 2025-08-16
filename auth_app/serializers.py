@@ -15,6 +15,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from auth_app.utils import upload_to_cloudinary, generate_unique_referral_code
+from wallet_app.services import update_bvn_on_reserved_account
 from .models import User, KYC, OTP, Referral
 
 import logging
@@ -204,6 +205,14 @@ class KYCSerializer(serializers.ModelSerializer):
                 validated_data.pop('proof_of_address', None)
 
             kyc = super().create(validated_data)
+            bvn = validated_data.get("bvn")
+
+            if bvn:
+                try:
+                    update_bvn_on_reserved_account(kyc.user, bvn)
+                except ValueError as e:
+                    # surface the error but do NOT roll back KYC
+                    raise serializers.ValidationError({"bvn": str(e)})
             logger.info(f"KYC created successfully for user: {kyc.user.email}")
             return kyc
             
@@ -257,8 +266,16 @@ class KYCSerializer(serializers.ModelSerializer):
                 validated_data.pop('proof_of_address', None)
 
             kyc = super().update(instance, validated_data)
+            old_bvn = instance.bvn
+            instance = super().update(instance, validated_data)
+            new_bvn = instance.bvn
+
+            if new_bvn and new_bvn != old_bvn:
+                try:
+                    update_bvn_on_reserved_account(instance.user, new_bvn)
+                except ValueError as e:
+                    raise serializers.ValidationError({"bvn": str(e)})
             logger.info(f"KYC updated successfully for user: {kyc.user.email}")
-            return kyc
             
         except Exception as e:
             logger.error(f"Error updating KYC: {str(e)}")

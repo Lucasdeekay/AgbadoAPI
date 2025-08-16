@@ -1,26 +1,19 @@
 """
-Wallet app views for handling wallet operations.
-
-This module contains views for managing wallet operations including
-balance checks, deposits, withdrawals, and transaction history
-with proper error handling and logging.
+Wallet views – thin wrappers that delegate to wallet/services.py
 """
-
 from decimal import Decimal
 import hmac
 import hashlib
 import os
-from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
-import requests
 import json # Import json for Paystack response parsing
 
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction as db_transaction
-from django.db import DatabaseError, IntegrityError
+from django.db.models import Q
 
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
@@ -35,369 +28,59 @@ from wallet_app.serializers import (
     WalletSerializer, # Use WalletSerializer for full wallet details
     TransactionSerializer,
     WithdrawalRequestSerializer, # For user input
-    WithdrawalDetailSerializer,   # For displaying processed withdrawals
-    BankSerializer
 )
 from auth_app.models import User # Ensure User model is correctly imported
+
+from rest_framework import status
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from auth_app.views import get_user_from_token
+from notification_app.models import Notification
+from wallet_app.services import (
+    create_dedicated_account_for_user,
+    fetch_balance_from_monnify,
+    initiate_withdrawal,
+)
+from wallet_app.models import Wallet, Transaction, Withdrawal
+from wallet_app.serializers import (
+    WalletSerializer,
+    TransactionSerializer,
+    WithdrawalRequestSerializer,
+    WithdrawalDetailSerializer,
+)
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Paystack Configuration
-PAYSTACK_SECRET_KEY = os.environ.get("PAYSTACK_SECRET_KEY")
-PAYSTACK_API_BASE_URL = "https://api.paystack.co"
+MONNIFY_SECRET_KEY = os.environ.get("MONNIFY_SECRET_KEY")
 
-# Helper function to get bank code (ideally from a cached DB table or Paystack's /bank API)
-def _get_bank_code(bank_name):
-    """
-    Retrieves the bank code from the local database.
-    Assumes the Bank model is populated via the fetch_from_paystack endpoint.
-    """
-    try:
-        # Try to find by exact name or slug
-        bank = Bank.objects.get(Q(name__iexact=bank_name) | Q(slug__iexact=bank_name), is_active=True)
-        return bank.code
-    except Bank.DoesNotExist:
-        # Fallback to crude match for common variations if needed, or raise error
-        # It's better to guide the user to select from a list
-        print(f"Bank '{bank_name}' not found in local database or not active.")
-        # You might still have a small, hardcoded fallback for well-known banks
-        # if your list isn't always fresh, but rely on DB first.
-        bank_codes_fallback = {
-            'wema bank': '035', 'zenith bank': '057', 'gtbank': '058', # etc.
-        }
-        return bank_codes_fallback.get(bank_name.lower(), None)
-    except Exception as e:
-        print(f"Error getting bank code for {bank_name}: {e}")
-        return None
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class GetWalletBalanceView(APIView):
-    """
-    Get wallet balance for the authenticated user.
-    
-    Retrieves current wallet balance and account information.
-    """
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        """
-        Get wallet balance for the authenticated user.
-        """
-        try:
-            user = get_user_from_token(request)
-            
-            if not user:
-                return Response(
-                    {"message": "Authentication failed: User not found."}, 
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-
-            wallet = get_object_or_404(Wallet, user=user)
-            
-            wallet_data = {
-                'id': wallet.id,
-                'balance': str(wallet.balance),
-                'currency': 'NGN',
-                'paystack_customer_code': wallet.paystack_customer_code,
-                'dva_account_number': wallet.dva_account_number,
-                'dva_account_name': wallet.dva_account_name,
-                'dva_bank_name': wallet.dva_bank_name,
-                'created_at': wallet.created_at.isoformat(),
-                'updated_at': wallet.updated_at.isoformat(),
-            }
-
-            logger.info(f"Wallet balance retrieved for user: {user.email}")
-            return Response({
-                'wallet': wallet_data
-            }, status=status.HTTP_200_OK)
-
-        except Wallet.DoesNotExist:
-            return Response(
-                {"message": "Wallet not found for this user."}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except DatabaseError:
-            logger.error(f"Database error while fetching wallet for user: {user.email if 'user' in locals() else 'unknown'}")
-            return Response({
-                "message": 'A database error occurred while fetching wallet information.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            logger.error(f"Unexpected error fetching wallet: {str(e)}")
-            return Response({
-                "message": f'An unexpected error occurred: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class GetTransactionHistoryView(APIView):
-    """
-    Get transaction history for the authenticated user.
-    
-    Retrieves paginated transaction history with filtering options.
-    """
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        """
-        Get transaction history for the authenticated user.
-        
-        Query parameters: page, page_size, transaction_type, status
-        """
-        try:
-            user = get_user_from_token(request)
-            
-            if not user:
-                return Response(
-                    {"message": "Authentication failed: User not found."}, 
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-
-            # Get query parameters
-            page = int(request.GET.get('page', 1))
-            page_size = int(request.GET.get('page_size', 10))
-            transaction_type = request.GET.get('transaction_type')
-            status_filter = request.GET.get('status')
-
-            # Build queryset
-            transactions = Transaction.objects.filter(user=user)
-            
-            if transaction_type:
-                transactions = transactions.filter(transaction_type=transaction_type)
-            if status_filter:
-                transactions = transactions.filter(status=status_filter)
-
-            # Pagination
-            start = (page - 1) * page_size
-            end = start + page_size
-            transactions_page = transactions[start:end]
-
-            transaction_data = []
-            for transaction in transactions_page:
-                transaction_data.append({
-                    'id': transaction.id,
-                    'transaction_type': transaction.transaction_type,
-                    'amount': str(transaction.amount),
-                    'status': transaction.status,
-                    'reference': transaction.reference,
-                    'paystack_transaction_id': transaction.paystack_transaction_id,
-                    'created_at': transaction.created_at.isoformat(),
-                })
-
-            total_count = transactions.count()
-            total_pages = (total_count + page_size - 1) // page_size
-
-            logger.info(f"Transaction history retrieved for user: {user.email}")
-            return Response({
-                'transactions': transaction_data,
-                'pagination': {
-                    'current_page': page,
-                    'total_pages': total_pages,
-                    'total_count': total_count,
-                    'page_size': page_size
-                }
-            }, status=status.HTTP_200_OK)
-
-        except ValueError:
-            return Response(
-                {"message": "Invalid pagination parameters."}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        except DatabaseError:
-            logger.error(f"Database error while fetching transactions for user: {user.email if 'user' in locals() else 'unknown'}")
-            return Response({
-                "message": 'A database error occurred while fetching transaction history.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            logger.error(f"Unexpected error fetching transaction history: {str(e)}")
-            return Response({
-                "message": f'An unexpected error occurred: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class GetWithdrawalHistoryView(APIView):
-    """
-    Get withdrawal history for the authenticated user.
-    
-    Retrieves paginated withdrawal history with filtering options.
-    """
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        """
-        Get withdrawal history for the authenticated user.
-        
-        Query parameters: page, page_size, status
-        """
-        try:
-            user = get_user_from_token(request)
-            
-            if not user:
-                return Response(
-                    {"message": "Authentication failed: User not found."}, 
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-
-            # Get query parameters
-            page = int(request.GET.get('page', 1))
-            page_size = int(request.GET.get('page_size', 10))
-            status_filter = request.GET.get('status')
-
-            # Build queryset
-            withdrawals = Withdrawal.objects.filter(user=user)
-            
-            if status_filter:
-                withdrawals = withdrawals.filter(status=status_filter)
-
-            # Pagination
-            start = (page - 1) * page_size
-            end = start + page_size
-            withdrawals_page = withdrawals[start:end]
-
-            withdrawal_data = []
-            for withdrawal in withdrawals_page:
-                withdrawal_data.append({
-                    'id': withdrawal.id,
-                    'bank_name': withdrawal.bank_name,
-                    'account_number': withdrawal.account_number,
-                    'account_name': withdrawal.account_name,
-                    'amount': str(withdrawal.amount),
-                    'status': withdrawal.status,
-                    'paystack_transfer_reference': withdrawal.paystack_transfer_reference,
-                    'failure_reason': withdrawal.failure_reason,
-                    'created_at': withdrawal.created_at.isoformat(),
-                    'updated_at': withdrawal.updated_at.isoformat(),
-                })
-
-            total_count = withdrawals.count()
-            total_pages = (total_count + page_size - 1) // page_size
-
-            logger.info(f"Withdrawal history retrieved for user: {user.email}")
-            return Response({
-                'withdrawals': withdrawal_data,
-                'pagination': {
-                    'current_page': page,
-                    'total_pages': total_pages,
-                    'total_count': total_count,
-                    'page_size': page_size
-                }
-            }, status=status.HTTP_200_OK)
-
-        except ValueError:
-            return Response(
-                {"message": "Invalid pagination parameters."}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        except DatabaseError:
-            logger.error(f"Database error while fetching withdrawals for user: {user.email if 'user' in locals() else 'unknown'}")
-            return Response({
-                "message": 'A database error occurred while fetching withdrawal history.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            logger.error(f"Unexpected error fetching withdrawal history: {str(e)}")
-            return Response({
-                "message": f'An unexpected error occurred: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class GetBanksListView(APIView):
-    """
-    Get list of available banks for withdrawals.
-    
-    Retrieves all active banks that can be used for withdrawals.
-    """
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        """
-        Get list of available banks for withdrawals.
-        """
-        try:
-            banks = Bank.objects.filter(is_active=True).order_by('name')
-            
-            banks_data = []
-            for bank in banks:
-                banks_data.append({
-                    'id': bank.id,
-                    'name': bank.name,
-                    'code': bank.code,
-                    'slug': bank.slug,
-                })
-
-            logger.info("Banks list retrieved")
-            return Response({
-                'banks': banks_data
-            }, status=status.HTTP_200_OK)
-
-        except DatabaseError:
-            logger.error("Database error while fetching banks list")
-            return Response({
-                "message": 'A database error occurred while fetching banks list.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            logger.error(f"Unexpected error fetching banks list: {str(e)}")
-            return Response({
-                "message": f'An unexpected error occurred: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-# 1. View to return wallet details and last 5 transactions
 class WalletDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated] # Enable permission
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        try:
-            user = get_user_from_token(request) # Ensure this correctly returns a User object
-
-            # Fetch wallet details - create if it doesn't exist (e.g., for new users)
-            wallet, created = Wallet.objects.get_or_create(user=user)
-
-            # Use the WalletSerializer for comprehensive details
-            wallet_data = WalletSerializer(wallet).data
-
-            # Fetch last 5 transactions
-            transactions = Transaction.objects.filter(user=user).order_by('-created_at')[:5]
-            transactions_data = TransactionSerializer(transactions, many=True).data
-
-            logger.info(f"Wallet details retrieved for user: {user.email}")
-            return Response({
-                "wallet": wallet_data,
-                "recent_transactions": transactions_data
-            }, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            logger.error(f"Unexpected error fetching wallet details: {str(e)}")
-            return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        user = get_user_from_token(request)
+        wallet, _ = Wallet.objects.get_or_create(user=user)
+        data = WalletSerializer(wallet).data
+        # Optionally enrich with Monnify account details
+        return Response({"wallet": data}, status=status.HTTP_200_OK)
 
 
-# 2. View to return all transactions for the user
 class AllTransactionsView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated] # Enable permission
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        try:
-            user = get_user_from_token(request)
-
-            # Fetch all transactions for the user
-            transactions = Transaction.objects.filter(user=user).order_by('-created_at')
-            transactions_data = TransactionSerializer(transactions, many=True).data
-
-            logger.info(f"All transactions retrieved for user: {user.email}")
-            return Response({"transactions": transactions_data}, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            logger.error(f"Unexpected error fetching all transactions: {str(e)}")
-            return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        user = get_user_from_token(request)
+        txs = Transaction.objects.filter(user=user).order_by("-created_at")
+        return Response(
+            {"transactions": TransactionSerializer(txs, many=True).data},
+            status=status.HTTP_200_OK,
+        )
 
 
 class TransactionDetailView(APIView):
@@ -424,290 +107,30 @@ class TransactionDetailView(APIView):
             return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# --- DEPOSIT HANDLING (REMOVED DIRECT USER INITIATION) ---
-# Direct user-initiated DepositView for `POST` is removed.
-# Deposits via Dedicated Virtual Accounts are handled by Paystack webhooks.
-# The client only needs to retrieve the DVA details from WalletDetailsView.
-
-
 class WithdrawalRequestView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated] # Enable permission
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user = get_user_from_token(request)
-
-        # Use the dedicated serializer for input validation
         serializer = WithdrawalRequestSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True) # Will raise 400 Bad Request if invalid
-
-        amount_to_withdraw = serializer.validated_data['amount']
-        bank_name = serializer.validated_data['bank_name']
-        account_number = serializer.validated_data['account_number']
+        serializer.is_valid(raise_exception=True)
 
         try:
-            # Ensure atomicity for balance deduction and record creation
-            with db_transaction.atomic():
-                user_wallet = Wallet.objects.select_for_update().get(user=user)
-
-                if user_wallet.balance < amount_to_withdraw:
-                    logger.warning(f"Insufficient balance for withdrawal for user: {user.email}")
-                    return Response(
-                        {"message": "Insufficient balance for withdrawal."},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-                # Deduct from balance immediately to prevent double spending
-                user_wallet.balance -= amount_to_withdraw
-                user_wallet.save(update_fields=['balance'])
-
-                # Create the Withdrawal record with 'Pending' status
-                withdrawal_instance = Withdrawal.objects.create(
-                    user=user,
-                    bank_name=bank_name,
-                    account_number=account_number,
-                    amount=amount_to_withdraw,
-                    status='Pending', # Initial status before Paystack interaction
-                )
-
-                # Create a corresponding Transaction for this withdrawal
-                transaction_instance = Transaction.objects.create(
-                    user=user,
-                    transaction_type='Withdrawal',
-                    amount=amount_to_withdraw,
-                    status='Pending', # Transaction status linked to withdrawal status
-                    # reference will be updated after Paystack transfer initiation
-                )
-
-            # Now, attempt to initiate the transfer with Paystack
-            paystack_response = self._initiate_paystack_transfer(
-                user,
-                amount_to_withdraw,
-                bank_name,
-                account_number,
-                withdrawal_instance # Pass instance to update its Paystack IDs
+            tx_ref = initiate_withdrawal(
+                user=user,
+                amount=Decimal(serializer.validated_data["amount"]),
+                bank_name=serializer.validated_data["bank_name"],
+                account_number=serializer.validated_data["account_number"],
             )
-
-            if paystack_response and paystack_response.get('status'):
-                # Paystack transfer initiated successfully (status is 'pending' on Paystack's side)
-                transfer_data = paystack_response['data']
-                withdrawal_instance.paystack_transfer_reference = transfer_data['reference']
-                withdrawal_instance.paystack_transfer_id = transfer_data['id']
-                withdrawal_instance.status = 'Processing' # Mark as processing in your system
-                withdrawal_instance.save(update_fields=['paystack_transfer_reference', 'paystack_transfer_id', 'status'])
-
-                # Update the related transaction's reference and status
-                transaction_instance.reference = transfer_data['reference']
-                transaction_instance.status = 'Processing'
-                transaction_instance.save(update_fields=['reference', 'status'])
-
-                Notification.objects.create(
-                    user=user,
-                    title="Withdrawal Initiated",
-                    message=f"Your withdrawal of {amount_to_withdraw} is being processed. It may take some time to reflect."
-                )
-                logger.info(f"Withdrawal initiated for user: {user.email}, amount: {amount_to_withdraw}")
-
-                return Response(
-                    WithdrawalDetailSerializer(withdrawal_instance).data, # Use Detail serializer for response
-                    status=status.HTTP_202_ACCEPTED, # 202 Accepted, as processing is ongoing
-                )
-            else:
-                # Paystack transfer initiation failed (e.g., invalid recipient, bank issues)
-                error_message = paystack_response.get('message', 'Failed to initiate Paystack transfer.')
-                logger.error(f"Paystack transfer initiation failed for user: {user.email}, amount: {amount_to_withdraw}, reason: {error_message}")
-
-                # Rollback balance deduction as transfer failed to start
-                user_wallet.balance += amount_to_withdraw
-                user_wallet.save(update_fields=['balance'])
-                withdrawal_instance.status = 'Failed'
-                withdrawal_instance.failure_reason = f"Paystack initiation failed: {error_message}"
-                withdrawal_instance.save(update_fields=['status', 'failure_reason'])
-
-                transaction_instance.status = 'Failed'
-                transaction_instance.reference = f"FAILED-INIT-{timezone.now().timestamp()}" # Unique failed ref
-                transaction_instance.save(update_fields=['status', 'reference'])
-
-                Notification.objects.create(
-                    user=user,
-                    title="Withdrawal Failed",
-                    message=f"Your withdrawal of {amount_to_withdraw} failed to initiate. Funds have been returned to your wallet. Reason: {error_message}"
-                )
-                logger.warning(f"Withdrawal failed to initiate for user: {user.email}, amount: {amount_to_withdraw}, reason: {error_message}")
-
-                return Response(
-                    {"message": f"Withdrawal request failed: {error_message}", "funds_returned": True},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-
-        except Wallet.DoesNotExist:
-            logger.error(f"Wallet not found for user: {user.email} during withdrawal request.")
-            return Response({"message": "Wallet not found for this user."}, status=status.HTTP_404_NOT_FOUND)
-        except requests.exceptions.RequestException as e:
-            # Catch network errors during API calls to Paystack
-            logger.error(f"Network error initiating Paystack transfer for user: {user.email}, amount: {amount_to_withdraw}, reason: {e}")
-
-            # Rollback balance deduction
-            try:
-                user_wallet.balance += amount_to_withdraw
-                user_wallet.save(update_fields=['balance'])
-                withdrawal_instance.status = 'Failed'
-                withdrawal_instance.failure_reason = f"Network/API error: {e}"
-                withdrawal_instance.save(update_fields=['status', 'failure_reason'])
-
-                transaction_instance.status = 'Failed'
-                transaction_instance.reference = f"NETWORK-ERR-{timezone.now().timestamp()}"
-                transaction_instance.save(update_fields=['status', 'reference'])
-
-                Notification.objects.create(
-                    user=user,
-                    title="Withdrawal Error",
-                    message=f"A network error occurred during your withdrawal of {amount_to_withdraw}. Funds have been returned to your wallet. Please try again."
-                )
-                logger.warning(f"Withdrawal failed due to network error for user: {user.email}, amount: {amount_to_withdraw}")
-                return Response(
-                    {"message": "A network error occurred while processing your withdrawal. Funds returned to wallet. Please try again later."},
-                    status=status.HTTP_503_SERVICE_UNAVAILABLE
-                )
-            except Exception as rollback_e:
-                # If rollback itself fails, log a critical error
-                logger.critical(f"Failed to rollback wallet balance for user {user.id} after transfer initiation error: {rollback_e}")
-                return Response(
-                    {"message": "A critical error occurred. Please contact support."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-        except Exception as e:
-            # Catch any other unexpected errors
-            logger.error(f"Unexpected error during withdrawal request for user: {user.email}, amount: {amount_to_withdraw}, reason: {e}")
-            # Attempt to rollback balance deduction
-            try:
-                user_wallet.balance += amount_to_withdraw
-                user_wallet.save(update_fields=['balance'])
-                withdrawal_instance.status = 'Failed'
-                withdrawal_instance.failure_reason = f"Unexpected error: {e}"
-                withdrawal_instance.save(update_fields=['status', 'failure_reason'])
-
-                transaction_instance.status = 'Failed'
-                transaction_instance.reference = f"UNEXPECTED-ERR-{timezone.now().timestamp()}"
-                transaction_instance.save(update_fields=['status', 'reference'])
-
-                Notification.objects.create(
-                    user=user,
-                    title="Withdrawal Error",
-                    message=f"An unexpected error occurred during your withdrawal of {amount_to_withdraw}. Funds have been returned to your wallet. Please try again."
-                )
-                logger.warning(f"Withdrawal failed due to unexpected error for user: {user.email}, amount: {amount_to_withdraw}")
-                return Response(
-                    {"message": "An unexpected error occurred while processing your withdrawal. Funds returned to wallet."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-            except Exception as rollback_e:
-                logger.critical(f"Failed to rollback wallet balance for user {user.id} after unexpected error: {rollback_e}")
-                return Response(
-                    {"message": "A critical error occurred. Please contact support."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-
-    def _initiate_paystack_transfer(self, user, amount, bank_name, account_number, withdrawal_instance):
-        """
-        Helper method to handle Paystack transfer initiation steps:
-        1. Resolve Account Number
-        2. Create/Get Transfer Recipient
-        3. Initiate Transfer
-        """
-        headers = {
-            'Authorization': f'Bearer {PAYSTACK_SECRET_KEY}',
-            'Content-Type': 'application/json'
-        }
-
-        # Step 1: Resolve Account Number
-        bank_code = _get_bank_code(bank_name)
-        if not bank_code:
-            raise ValueError(f"Invalid or unsupported bank name: {bank_name}")
-
-        try:
-            resolve_url = f"{PAYSTACK_API_BASE_URL}/bank/resolve?account_number={account_number}&bank_code={bank_code}"
-            resolve_response = requests.get(resolve_url, headers=headers)
-            resolve_response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
-            resolved_data = resolve_response.json()
-
-            if resolved_data.get('status'):
-                resolved_account_name = resolved_data['data']['account_name']
-                # Update withdrawal instance with verified account name
-                withdrawal_instance.account_name = resolved_account_name
-                # Note: We save the instance at the end of the main try block's success path
-                # so intermediate saves are handled there for atomic operations.
-            else:
-                raise Exception(f"Account resolution failed: {resolved_data.get('message', 'Unknown error')}")
-
-        except requests.exceptions.RequestException as e:
-            raise requests.exceptions.RequestException(f"Paystack Account Resolution API error: {e}")
-        except Exception as e:
-            raise Exception(f"Account resolution error: {e}")
-
-        # Step 2: Create or retrieve Transfer Recipient
-        # For robustness, you might want to check if a recipient for this account_number already exists
-        # within your system or on Paystack before creating a new one every time.
-        # For this example, we'll create one if it doesn't exist, or reuse by getting it.
-        # A more robust solution involves storing recipient_code on your User or a separate model.
-        recipient_code = None
-        # You could try to list existing recipients and find a match for reuse
-        # Or, just create a new one each time for simplicity in this example, Paystack handles duplicates well.
-        
-        recipient_payload = {
-            'type': 'nuban',
-            'name': resolved_account_name, # Use the verified name
-            'description': f"Withdrawal for {user.email}",
-            'account_number': account_number,
-            'bank_code': bank_code,
-            'currency': 'NGN' # Ensure this matches your Paystack account currency
-        }
-        try:
-            recipient_response = requests.post(
-                f"{PAYSTACK_API_BASE_URL}/transferrecipient",
-                headers=headers,
-                json=recipient_payload
-            )
-            recipient_response.raise_for_status()
-            recipient_data = recipient_response.json()
-
-            if recipient_data.get('status'):
-                recipient_code = recipient_data['data']['recipient_code']
-                withdrawal_instance.paystack_recipient_code = recipient_code
-                # Note: We save the instance at the end of the main try block's success path
-            else:
-                raise Exception(f"Failed to create transfer recipient: {recipient_data.get('message', 'Unknown error')}")
-        except requests.exceptions.RequestException as e:
-            raise requests.exceptions.RequestException(f"Paystack Transfer Recipient API error: {e}")
-        except Exception as e:
-            raise Exception(f"Error creating transfer recipient: {e}")
-
-        # Step 3: Initiate Transfer
-        transfer_payload = {
-            'source': 'balance', # Transfers from your Paystack balance
-            'amount': int(amount * 100), # Amount in kobo/pesewas
-            'recipient': recipient_code,
-            'reason': f"Withdrawal for {user.email} - {account_number}",
-            'reference': f"WITHDRAWAL-{user.id}-{withdrawal_instance.id}-{timezone.now().timestamp()}" # Highly unique reference
-        }
-
-        try:
-            transfer_response = requests.post(
-                f"{PAYSTACK_API_BASE_URL}/transfer",
-                headers=headers,
-                json=transfer_payload
-            )
-            transfer_response.raise_for_status()
-            return transfer_response.json() # Returns Paystack's response for further processing
-        except requests.exceptions.RequestException as e:
-            raise requests.exceptions.RequestException(f"Paystack Transfer Initiation API error: {e}")
-        except Exception as e:
-            raise Exception(f"Error initiating Paystack transfer: {e}")
+            return Response({"reference": tx_ref}, status=status.HTTP_201_CREATED)
+        except ValueError as e:
+            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
 
 
 @method_decorator(csrf_exempt, name='dispatch') # Disable CSRF for webhook endpoint
-class PaystackWebhookView(APIView):
+class MonnifyWebhookView(APIView):
     authentication_classes = [] # No authentication for webhooks
     permission_classes = []     # No permissions for webhooks
 
@@ -723,7 +146,7 @@ class PaystackWebhookView(APIView):
 
         # Hash the payload with your secret key
         digest = hmac.new(
-            PAYSTACK_SECRET_KEY.encode('utf-8'),
+            MONNIFY_SECRET_KEY.encode('utf-8'),
             raw_payload.encode('utf-8'),
             hashlib.sha512
         ).hexdigest()
