@@ -1,4 +1,10 @@
-from datetime import timedelta
+"""
+Authentication app models for user management, KYC, OTP, and referrals.
+
+This module contains models for custom user, KYC, OTP, WebAuthn credentials, and referral tracking.
+"""
+
+from datetime import datetime, timedelta
 
 from django.contrib.auth.base_user import BaseUserManager, AbstractBaseUser
 from django.db import models
@@ -7,7 +13,28 @@ from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
+    """
+    Custom user manager for creating users and superusers.
+    
+    Provides methods for creating regular users and superusers with proper
+    field validation and default values.
+    """
+    
     def create_user(self, email, password=None, **extra_fields):
+        """
+        Create and save a regular user.
+        
+        Args:
+            email: User's email address
+            password: User's password
+            **extra_fields: Additional user fields
+            
+        Returns:
+            User: The created user instance
+            
+        Raises:
+            ValueError: If email is not provided
+        """
         if not email:
             raise ValueError("The Email field must be set")
         email = self.normalize_email(email)
@@ -17,6 +44,17 @@ class UserManager(BaseUserManager):
         return user
 
     def create_superuser(self, email, password=None, **extra_fields):
+        """
+        Create and save a superuser.
+        
+        Args:
+            email: User's email address
+            password: User's password
+            **extra_fields: Additional user fields
+            
+        Returns:
+            User: The created superuser instance
+        """
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
 
@@ -24,79 +62,297 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractUser):
+    """
+    Custom user model for authentication and profile management.
+    
+    Extends Django's AbstractUser to provide custom fields for
+    phone number, state, service provider status, and verification.
+    """
     username = None  # Remove the username field
-    email = models.EmailField(unique=True)
-    phone_number = models.CharField(max_length=15, unique=True)
-    state = models.CharField(max_length=50)
-    is_service_provider = models.BooleanField(default=False)
-    is_verified = models.BooleanField(default=False)  # To check if the user has completed KYC
-    date_joined = models.DateTimeField(auto_now_add=True)
-    profile_picture = models.URLField(null=True, blank=True)
-    referral_code = models.CharField(max_length=15, unique=True, null=True, blank=True)
-    is_busy = models.BooleanField(default=False)
-    pin = models.CharField(max_length=6, null=True, blank=True) # User's PIN for additional security
+    email = models.EmailField(
+        unique=True, 
+        help_text="User's email address"
+    )
+    phone_number = models.CharField(
+        max_length=15, 
+        unique=True, 
+        help_text="User's phone number"
+    )
+    state = models.CharField(
+        max_length=50, 
+        help_text="User's state of residence"
+    )
+    is_service_provider = models.BooleanField(
+        default=False, 
+        help_text="Is the user a service provider?"
+    )
+    is_verified = models.BooleanField(
+        default=False, 
+        help_text="Has the user completed KYC?"
+    )
+    date_joined = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="Date the user joined"
+    )
+    profile_picture = models.URLField(
+        null=True, 
+        blank=True, 
+        help_text="Profile picture URL"
+    )
+    referral_code = models.CharField(
+        max_length=15, 
+        unique=True, 
+        null=True, 
+        blank=True, 
+        help_text="User's referral code"
+    )
+    is_busy = models.BooleanField(
+        default=False, 
+        help_text="Is the user currently busy?"
+    )
+    pin = models.CharField(
+        max_length=6, 
+        null=True, 
+        blank=True, 
+        help_text="User's PIN for additional security"
+    )
 
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['phone_number']
 
-    def __str__(self):
+    class Meta:
+        verbose_name = "User"
+        verbose_name_plural = "Users"
+        ordering = ['-date_joined']
+
+    def __str__(self) -> str:
+        """String representation of the User."""
         return self.email
 
+    def get_full_name(self) -> str:
+        """Get the user's full name."""
+        return f"{self.first_name} {self.last_name}".strip() or self.email
 
-# New model for WebAuthn Credentials
+    def get_short_name(self) -> str:
+        """Get the user's short name."""
+        return self.first_name or self.email
+
+
 class WebAuthnCredential(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='webauthn_credentials')
-    credential_id = models.CharField(max_length=255, unique=True, db_index=True) # Identifier for the credential
-    public_key = models.TextField() # Base64URL encoded public key
-    sign_count = models.BigIntegerField(default=0) # Counter to prevent replay attacks
-    transports = models.CharField(max_length=100, blank=True, null=True) # e.g., 'usb,nfc,ble,internal'
-    # Flags: `uv` (user verified), `up` (user present)
-    # Consider adding `device_name` or `last_used` for better UX/security management
-    registered_at = models.DateTimeField(auto_now_add=True)
-    last_used = models.DateTimeField(null=True, blank=True)
+    """
+    Model for storing WebAuthn credentials for passwordless authentication.
+    
+    Stores FIDO2 credentials for secure biometric authentication
+    including public keys and transport methods.
+    """
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='webauthn_credentials',
+        help_text="User associated with this credential"
+    )
+    credential_id = models.CharField(
+        max_length=255, 
+        unique=True, 
+        db_index=True, 
+        help_text="Identifier for the credential"
+    )
+    public_key = models.TextField(
+        help_text="Base64URL encoded public key"
+    )
+    sign_count = models.BigIntegerField(
+        default=0, 
+        help_text="Counter to prevent replay attacks"
+    )
+    transports = models.CharField(
+        max_length=100, 
+        blank=True, 
+        null=True, 
+        help_text="e.g., 'usb,nfc,ble,internal'"
+    )
+    registered_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When credential was registered"
+    )
+    last_used = models.DateTimeField(
+        null=True, 
+        blank=True, 
+        help_text="When credential was last used"
+    )
 
-    def __str__(self):
+    class Meta:
+        verbose_name = "WebAuthn Credential"
+        verbose_name_plural = "WebAuthn Credentials"
+        ordering = ['-registered_at']
+
+    def __str__(self) -> str:
+        """String representation of the WebAuthnCredential."""
         return f"Credential for {self.user.email} - ID: {self.credential_id[:10]}..."
 
 
 class KYC(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="kyc")
-    national_id = models.URLField(null=True, blank=True)
-    bvn = models.CharField(max_length=11, null=True, blank=True)
-    driver_license = models.URLField(null=True, blank=True)
-    proof_of_address = models.URLField(null=True, blank=True)
-    status = models.CharField(max_length=10,
-                              choices=[('Pending', 'Pending'), ('Verified', 'Verified'), ('Rejected', 'Rejected')],
-                              default='Pending')
-    updated_at = models.DateTimeField(auto_now_add=True)
-    verified_at = models.DateTimeField(null=True, blank=True)
+    """
+    Model for storing Know Your Customer (KYC) information for users.
+    
+    Manages user verification documents including national ID,
+    driver license, proof of address, and BVN.
+    """
+    STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Verified', 'Verified'),
+        ('Rejected', 'Rejected'),
+    ]
+    
+    user = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name="kyc",
+        help_text="User associated with this KYC record"
+    )
+    national_id = models.URLField(
+        null=True, 
+        blank=True, 
+        help_text="URL to uploaded national ID document"
+    )
+    bvn = models.CharField(
+        max_length=11, 
+        null=True, 
+        blank=True, 
+        help_text="Bank Verification Number"
+    )
+    driver_license = models.URLField(
+        null=True, 
+        blank=True, 
+        help_text="URL to uploaded driver's license"
+    )
+    proof_of_address = models.URLField(
+        null=True, 
+        blank=True, 
+        help_text="URL to proof of address document"
+    )
+    status = models.CharField(
+        max_length=10, 
+        choices=STATUS_CHOICES, 
+        default='Pending',
+        help_text="KYC verification status"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        help_text="When KYC was last updated"
+    )
+    verified_at = models.DateTimeField(
+        null=True, 
+        blank=True, 
+        help_text="When KYC was verified"
+    )
 
-    def __str__(self):
-        return f"KYC for {self.user.email}"
+    class Meta:
+        verbose_name = "KYC"
+        verbose_name_plural = "KYC Records"
+        ordering = ['-updated_at']
+
+    def __str__(self) -> str:
+        """String representation of the KYC record."""
+        return f"KYC for {self.user.email} - {self.status}"
+
+    def is_complete(self) -> bool:
+        """
+        Check if KYC has all required documents.
+        
+        Returns:
+            bool: True if KYC has all required documents
+        """
+        return bool(self.national_id and self.bvn and self.proof_of_address)
 
 
 class OTP(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    otp = models.CharField(max_length=5)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_used = models.BooleanField(default=False)
+    """
+    Model for storing one-time passwords (OTP) for user verification.
+    
+    Manages OTP codes for email verification, password resets,
+    and other security operations.
+    """
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='otps',
+        help_text="User associated with this OTP"
+    )
+    otp = models.CharField(
+        max_length=6, 
+        help_text="The OTP code sent to the user"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the OTP was created"
+    )
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the OTP expires"
+    )
+    is_used = models.BooleanField(
+        default=False, 
+        help_text="Whether the OTP has been used"
+    )
 
-    def is_expired(self):
-        """
-        Check if OTP is expired (1 hour after creation).
-        """
-        expiration_time = self.created_at + timedelta(hours=1)
-        return timezone.now() > expiration_time
+    class Meta:
+        verbose_name = "OTP"
+        verbose_name_plural = "OTPs"
+        ordering = ['-created_at']
 
-    def __str__(self):
+    def save(self, *args, **kwargs):
+        """Set expiration time when creating OTP."""
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(hours=1)
+        super().save(*args, **kwargs)
+
+    def is_expired(self) -> bool:
+        """
+        Check if OTP is expired.
+        
+        Returns:
+            bool: True if OTP is expired
+        """
+        return timezone.now() > self.expires_at
+
+    def __str__(self) -> str:
+        """String representation of the OTP."""
         return f"OTP for {self.user.email} - {'Used' if self.is_used else 'Not Used'}"
 
-class Referral(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="referral_user")
-    referer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="referral_referer")
-    created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.user.email} referral - {self.referer.email}"
+class Referral(models.Model):
+    """
+    Model for tracking user referrals.
+    
+    Manages the relationship between users who refer others
+    and users who were referred, for reward tracking.
+    """
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name="referral_user",
+        help_text="User who was referred"
+    )
+    referer = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name="referral_referer",
+        help_text="User who referred"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the referral was created"
+    )
+
+    class Meta:
+        verbose_name = "Referral"
+        verbose_name_plural = "Referrals"
+        ordering = ['-created_at']
+        unique_together = ['user', 'referer']
+
+    def __str__(self) -> str:
+        """String representation of the Referral."""
+        return f"{self.user.email} referred by {self.referer.email}"

@@ -1,145 +1,552 @@
+"""
+Wallet app models for financial management.
+
+This module contains models for managing user wallets, transactions,
+withdrawals, and bank information with Paystack integration.
+"""
+
+from datetime import datetime
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 from auth_app.models import User
 
 
 class Wallet(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="wallet")
-    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    """
+    Model representing a user's wallet for managing balances and virtual accounts.
     
-    # Paystack Customer ID for this user
-    # This is crucial for creating DVAs and managing customer-related operations
-    paystack_customer_code = models.CharField(max_length=50, unique=True, null=True, blank=True)
-    
-    # Dedicated Virtual Account details for deposits
-    dva_account_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
-    dva_account_name = models.CharField(max_length=200, null=True, blank=True)
-    dva_bank_name = models.CharField(max_length=100, null=True, blank=True)
-    dva_assigned_at = models.DateTimeField(null=True, blank=True) # When the DVA was assigned
+    Manages user wallet information including balance, Paystack integration,
+    and dedicated virtual account (DVA) details.
+    """
+    user = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name="wallet",
+        help_text="User account associated with this wallet"
+    )
+    balance = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=0.00,
+        validators=[MinValueValidator(0.00)],
+        help_text="Current wallet balance"
+    )
+    paystack_customer_code = models.CharField(
+        max_length=50, 
+        unique=True, 
+        null=True, 
+        blank=True, 
+        help_text="Paystack customer code for this user"
+    )
+    dva_account_number = models.CharField(
+        max_length=20, 
+        unique=True, 
+        null=True, 
+        blank=True, 
+        help_text="Dedicated Virtual Account number"
+    )
+    dva_account_name = models.CharField(
+        max_length=200, 
+        null=True, 
+        blank=True, 
+        help_text="Name on the DVA account"
+    )
+    dva_bank_name = models.CharField(
+        max_length=100, 
+        null=True, 
+        blank=True, 
+        help_text="Bank name for the DVA"
+    )
+    dva_assigned_at = models.DateTimeField(
+        null=True, 
+        blank=True, 
+        help_text="When the DVA was assigned"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        help_text="When the wallet was last updated"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the wallet was created"
+    )
 
-    updated_at = models.DateTimeField(auto_now=True)
-    created_at = models.DateTimeField(auto_now_add=True) # Add created_at for better tracking
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Wallet"
+        verbose_name_plural = "Wallets"
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['balance']),
+        ]
 
-    def __str__(self):
-        return f"Wallet of {self.user.email}"
+    def __str__(self) -> str:
+        """String representation of the Wallet."""
+        return f"Wallet of {self.user.email} - ₦{self.balance:,.2f}"
 
-    # You might want to automatically create a Wallet for a new User
-    # This is handled by a signal below.
+    def add_funds(self, amount):
+        """
+        Add funds to wallet balance.
+        
+        Args:
+            amount: Amount to add (positive decimal)
+        """
+        if amount <= 0:
+            raise ValueError("Amount must be positive.")
+        self.balance += amount
+        self.save(update_fields=['balance', 'updated_at'])
+
+    def deduct_funds(self, amount):
+        """
+        Deduct funds from wallet balance.
+        
+        Args:
+            amount: Amount to deduct (positive decimal)
+            
+        Raises:
+            ValueError: If insufficient balance
+        """
+        if amount <= 0:
+            raise ValueError("Amount must be positive.")
+        if self.balance < amount:
+            raise ValueError("Insufficient balance.")
+        self.balance -= amount
+        self.save(update_fields=['balance', 'updated_at'])
+
+    def get_balance_display(self):
+        """
+        Get formatted balance display.
+        
+        Returns:
+            str: Formatted balance with currency symbol
+        """
+        return f"₦{self.balance:,.2f}"
+
+    def has_sufficient_balance(self, amount):
+        """
+        Check if wallet has sufficient balance.
+        
+        Args:
+            amount: Amount to check against
+            
+        Returns:
+            bool: True if sufficient balance, False otherwise
+        """
+        return self.balance >= amount
+
+    @classmethod
+    def get_total_balance(cls):
+        """
+        Get total balance across all wallets.
+        
+        Returns:
+            Decimal: Total balance across all wallets
+        """
+        return cls.objects.aggregate(total=models.Sum('balance'))['total'] or 0
 
 
 class Transaction(models.Model):
+    """
+    Model representing a transaction (deposit, withdrawal, payment) in the wallet.
+    
+    Manages transaction records including types, amounts, status,
+    and Paystack integration details.
+    """
     TRANSACTION_TYPES = [
-        ('Deposit', 'Deposit'),
-        ('Withdrawal', 'Withdrawal'),
-        ('Payment', 'Payment'), # E.g., payment for a service on your platform
+        ('deposit', 'Deposit'),
+        ('withdrawal', 'Withdrawal'),
+        ('transfer', 'Transfer'),
+        ('refund', 'Refund'),
     ]
-    
     TRANSACTION_STATUSES = [
-        ('Pending', 'Pending'),
-        ('Completed', 'Completed'),
-        ('Failed', 'Failed'),
-        ('Reversed', 'Reversed'), # For funds returned after a failed withdrawal
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('reversed', 'Reversed'),
     ]
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="transactions")
-    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
     
-    # Use a more descriptive name for transaction_id if it's external (e.g., Paystack reference)
-    # This will store the Paystack `reference` for deposits (charge.success) or transfers
-    reference = models.CharField(max_length=50, unique=True, null=True, blank=True) 
-    
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    status = models.CharField(max_length=10, choices=TRANSACTION_STATUSES, default='Pending')
-    
-    # Optional: Store Paystack's transaction ID (distinct from reference) if needed
-    paystack_transaction_id = models.IntegerField(null=True, blank=True, help_text="Paystack transaction ID (internal)")
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name="transactions",
+        help_text="User who performed the transaction"
+    )
+    transaction_type = models.CharField(
+        max_length=20, 
+        choices=TRANSACTION_TYPES, 
+        help_text="Type of transaction"
+    )
+    reference = models.CharField(
+        max_length=50, 
+        unique=True, 
+        null=True, 
+        blank=True, 
+        help_text="External reference (e.g., Paystack)"
+    )
+    amount = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        help_text="Transaction amount"
+    )
+    status = models.CharField(
+        max_length=10, 
+        choices=TRANSACTION_STATUSES, 
+        default='pending', 
+        help_text="Transaction status"
+    )
+    paystack_transaction_id = models.CharField(
+        max_length=100,
+        null=True, 
+        blank=True, 
+        help_text="Paystack transaction ID"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the transaction was created"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        help_text="When the transaction was last updated"
+    )
 
-    # You can add a field to link to the Withdrawal model if transaction_type is 'Withdrawal'
-    # For now, `reference` will be enough to link back to Paystack's transfer.
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Transaction"
+        verbose_name_plural = "Transactions"
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['transaction_type', 'status']),
+            models.Index(fields=['reference']),
+        ]
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    def __str__(self) -> str:
+        """String representation of the Transaction."""
+        return f"{self.get_transaction_type_display()} - ₦{self.amount:,.2f} by {self.user.email} ({self.status})"
 
-    def __str__(self):
-        return f"{self.transaction_type} - {self.amount} by {self.user.email} ({self.status})"
+    def get_amount_display(self):
+        """
+        Get formatted amount display.
+        
+        Returns:
+            str: Formatted amount with currency symbol
+        """
+        return f"₦{self.amount:,.2f}"
+
+    def is_successful(self):
+        """
+        Check if transaction was successful.
+        
+        Returns:
+            bool: True if transaction is completed, False otherwise
+        """
+        return self.status == 'completed'
+
+    def can_be_reversed(self):
+        """
+        Check if transaction can be reversed.
+        
+        Returns:
+            bool: True if transaction can be reversed, False otherwise
+        """
+        return self.status == 'completed' and self.transaction_type in ['deposit', 'transfer']
+
+    @classmethod
+    def get_user_transactions(cls, user, limit=None):
+        """
+        Get transactions for a specific user.
+        
+        Args:
+            user: User instance
+            limit: Maximum number of transactions to return
+            
+        Returns:
+            QuerySet: User's transactions
+        """
+        queryset = cls.objects.filter(user=user)
+        if limit:
+            queryset = queryset[:limit]
+        return queryset
+
+    @classmethod
+    def get_total_by_type(cls, transaction_type):
+        """
+        Get total amount for a specific transaction type.
+        
+        Args:
+            transaction_type: Type of transaction
+            
+        Returns:
+            Decimal: Total amount for the transaction type
+        """
+        return cls.objects.filter(
+            transaction_type=transaction_type, 
+            status='completed'
+        ).aggregate(total=models.Sum('amount'))['total'] or 0
 
 
 class Withdrawal(models.Model):
+    """
+    Model representing a withdrawal request from a user's wallet.
+    
+    Manages withdrawal requests including bank details, amounts,
+    status tracking, and Paystack transfer integration.
+    """
     STATUS_CHOICES = [
-        ('Pending', 'Pending'), # Initiated by user, waiting for processing
-        ('Processing', 'Processing'), # Sent to Paystack, waiting for their response
-        ('Completed', 'Completed'), # Successfully transferred by Paystack
-        ('Failed', 'Failed'),       # Failed by Paystack
-        ('Reversed', 'Reversed'),   # Funds returned to wallet after Paystack failure
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
     ]
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="withdrawals")
     
-    # Bank details provided by the user for this specific withdrawal
-    bank_name = models.CharField(max_length=100)
-    account_number = models.CharField(max_length=20)
-    account_name = models.CharField(max_length=200, null=True, blank=True) # Will be verified by Paystack
-
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    
-    # Paystack transfer recipient code
-    # This identifies the beneficiary on Paystack's side. You might create one per account number.
-    paystack_recipient_code = models.CharField(max_length=50, null=True, blank=True, 
-                                               help_text="Paystack Transfer Recipient Code")
-    
-    # Paystack transfer reference for this withdrawal request
-    paystack_transfer_reference = models.CharField(max_length=50, unique=True, null=True, blank=True, 
-                                                    help_text="Unique reference for Paystack transfer")
-    
-    # Optional: Paystack's internal ID for the transfer
-    paystack_transfer_id = models.IntegerField(null=True, blank=True, help_text="Paystack internal Transfer ID")
-
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
-    
-    # Reason for failure (if any)
-    failure_reason = models.TextField(null=True, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True) # Track when the status changes
-
-    def __str__(self):
-        return f"Withdrawal by {self.user.email} - {self.amount} ({self.status})"
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name="withdrawals",
+        help_text="User requesting the withdrawal"
+    )
+    bank_name = models.CharField(
+        max_length=100, 
+        help_text="Bank name for the withdrawal"
+    )
+    account_number = models.CharField(
+        max_length=20, 
+        help_text="Bank account number for the withdrawal"
+    )
+    account_name = models.CharField(
+        max_length=200, 
+        null=True, 
+        blank=True, 
+        help_text="Account name (verified by Paystack)"
+    )
+    amount = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        validators=[MinValueValidator(100.00)],
+        help_text="Withdrawal amount"
+    )
+    paystack_recipient_code = models.CharField(
+        max_length=50, 
+        null=True, 
+        blank=True, 
+        help_text="Paystack Transfer Recipient Code"
+    )
+    paystack_transfer_reference = models.CharField(
+        max_length=50, 
+        unique=True, 
+        null=True, 
+        blank=True, 
+        help_text="Unique reference for Paystack transfer"
+    )
+    paystack_transfer_id = models.CharField(
+        max_length=100,
+        null=True, 
+        blank=True, 
+        help_text="Paystack internal Transfer ID"
+    )
+    status = models.CharField(
+        max_length=10, 
+        choices=STATUS_CHOICES, 
+        default='pending', 
+        help_text="Withdrawal status"
+    )
+    failure_reason = models.TextField(
+        null=True, 
+        blank=True, 
+        help_text="Reason for failure (if any)"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the withdrawal was created"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        help_text="When the withdrawal was last updated"
+    )
 
     class Meta:
-        ordering = ['-created_at'] # Order by most recent withdrawals first
+        ordering = ['-created_at']
+        verbose_name = "Withdrawal"
+        verbose_name_plural = "Withdrawals"
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['status']),
+            models.Index(fields=['bank_name']),
+        ]
+
+    def __str__(self) -> str:
+        """String representation of the Withdrawal."""
+        return f"Withdrawal by {self.user.email} - ₦{self.amount:,.2f} ({self.status})"
+
+    def get_amount_display(self):
+        """
+        Get formatted amount display.
+        
+        Returns:
+            str: Formatted amount with currency symbol
+        """
+        return f"₦{self.amount:,.2f}"
+
+    def is_processing(self):
+        """
+        Check if withdrawal is being processed.
+        
+        Returns:
+            bool: True if withdrawal is processing, False otherwise
+        """
+        return self.status in ['pending', 'processing']
+
+    def is_completed(self):
+        """
+        Check if withdrawal is completed.
+        
+        Returns:
+            bool: True if withdrawal is completed, False otherwise
+        """
+        return self.status == 'completed'
+
+    def is_failed(self):
+        """
+        Check if withdrawal failed.
+        
+        Returns:
+            bool: True if withdrawal failed, False otherwise
+        """
+        return self.status == 'failed'
+
+    @classmethod
+    def get_pending_withdrawals(cls):
+        """
+        Get all pending withdrawals.
+        
+        Returns:
+            QuerySet: Pending withdrawals
+        """
+        return cls.objects.filter(status='pending')
+
+    @classmethod
+    def get_user_withdrawals(cls, user, limit=None):
+        """
+        Get withdrawals for a specific user.
+        
+        Args:
+            user: User instance
+            limit: Maximum number of withdrawals to return
+            
+        Returns:
+            QuerySet: User's withdrawals
+        """
+        queryset = cls.objects.filter(user=user)
+        if limit:
+            queryset = queryset[:limit]
+        return queryset
 
 
 class Bank(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    code = models.CharField(max_length=10, unique=True)
-    slug = models.CharField(max_length=100, unique=True, null=True, blank=True) # Paystack slug
-    is_active = models.BooleanField(default=True)
-    added_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.name} ({self.code})"
+    """
+    Model representing a bank supported for wallet withdrawals.
+    
+    Manages bank information for withdrawal operations
+    including bank codes and Paystack integration.
+    """
+    name = models.CharField(
+        max_length=100, 
+        unique=True, 
+        help_text="Bank name"
+    )
+    code = models.CharField(
+        max_length=10, 
+        unique=True, 
+        help_text="Bank code (e.g., NUBAN code)"
+    )
+    slug = models.CharField(
+        max_length=100, 
+        unique=True, 
+        null=True, 
+        blank=True, 
+        help_text="Paystack slug for the bank"
+    )
+    is_active = models.BooleanField(
+        default=True, 
+        help_text="Whether the bank is currently active/available"
+    )
+    added_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the bank was added"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        help_text="When the bank was last updated"
+    )
 
     class Meta:
         ordering = ['name']
+        verbose_name = "Bank"
+        verbose_name_plural = "Banks"
+        indexes = [
+            models.Index(fields=['name']),
+            models.Index(fields=['code']),
+            models.Index(fields=['is_active']),
+        ]
+
+    def __str__(self) -> str:
+        """String representation of the Bank."""
+        return f"{self.name} ({self.code})"
+
+    @classmethod
+    def get_active_banks(cls):
+        """
+        Get all active banks.
+        
+        Returns:
+            QuerySet: Active banks
+        """
+        return cls.objects.filter(is_active=True)
+
+    @classmethod
+    def get_bank_by_code(cls, code):
+        """
+        Get bank by code.
+        
+        Args:
+            code: Bank code
+            
+        Returns:
+            Bank: Bank instance or None
+        """
+        try:
+            return cls.objects.get(code=code, is_active=True)
+        except cls.DoesNotExist:
+            return None
 
 
 # Signal to create a Wallet for every new User
 @receiver(post_save, sender=User)
 def create_user_wallet(sender, instance, created, **kwargs):
+    """
+    Create a wallet for new users.
+    
+    Automatically creates a wallet when a new user is created.
+    """
     if created:
         Wallet.objects.create(user=instance)
 
-# Signal to save the Wallet when the User is saved (though OneToOneField might handle this implicitly)
+
+# Signal to save the Wallet when the User is saved
 @receiver(post_save, sender=User)
 def save_user_wallet(sender, instance, **kwargs):
+    """
+    Save user wallet when user is updated.
+    
+    Ensures wallet is saved when user is updated.
+    """
     try:
         instance.wallet.save()
     except Wallet.DoesNotExist:
-        # This might happen if a user is created without the signal above firing,
-        # or if the wallet was manually deleted.
-        # Consider creating it here as a fallback or logging an error.
+        # Create wallet if it doesn't exist (fallback)
         Wallet.objects.create(user=instance)
 

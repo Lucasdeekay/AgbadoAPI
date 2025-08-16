@@ -5,7 +5,7 @@ from .views import DeleteAllNotificationsView, DeleteMultipleNotificationsView, 
 from .viewsets import NotificationViewSet
 
 router = DefaultRouter()
-router.register(r'notifications', NotificationViewSet)
+router.register(r'notifications', NotificationViewSet, basename='notification')
 
 
 urlpatterns = [

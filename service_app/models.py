@@ -1,4 +1,14 @@
+"""
+Service app models for service management.
+
+This module contains models for managing services, subservices, service requests,
+bids, and bookings with comprehensive business logic and helper methods.
+"""
+
+from datetime import datetime
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 
 from auth_app.models import User
 from provider_app.models import ServiceProvider
@@ -21,92 +31,691 @@ CATEGORIES = [
     ('Others', 'Others'),
 ]
 
-class Service(models.Model):
-    provider = models.ForeignKey(ServiceProvider, on_delete=models.CASCADE, related_name="services")
-    name = models.CharField(max_length=255)
-    description = models.TextField()
-    image = models.URLField(null=True, blank=True)
-    category = models.CharField(max_length=100, choices=CATEGORIES)  # Updated to use choices
-    min_price = models.DecimalField(max_digits=16, decimal_places=2)
-    max_price = models.DecimalField(max_digits=16, decimal_places=2)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return self.name
+class Service(models.Model):
+    """
+    Model representing a service offered by a provider.
+    
+    Manages service information including pricing, categories,
+    availability status, and provider details.
+    """
+    provider = models.ForeignKey(
+        ServiceProvider, 
+        on_delete=models.CASCADE, 
+        related_name="services",
+        help_text="Service provider offering this service"
+    )
+    name = models.CharField(
+        max_length=255, 
+        help_text="Name of the service"
+    )
+    description = models.TextField(
+        help_text="Detailed description of the service"
+    )
+    image = models.URLField(
+        null=True, 
+        blank=True, 
+        help_text="URL to an image representing the service"
+    )
+    category = models.CharField(
+        max_length=100, 
+        choices=CATEGORIES, 
+        help_text="Service category/type"
+    )
+    min_price = models.DecimalField(
+        max_digits=16, 
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        help_text="Minimum price for the service"
+    )
+    max_price = models.DecimalField(
+        max_digits=16, 
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        help_text="Maximum price for the service"
+    )
+    is_active = models.BooleanField(
+        default=True, 
+        help_text="Whether the service is currently active"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the service was created"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        help_text="When the service was last updated"
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Service"
+        verbose_name_plural = "Services"
+        indexes = [
+            models.Index(fields=['provider', '-created_at']),
+            models.Index(fields=['category', 'is_active']),
+            models.Index(fields=['min_price', 'max_price']),
+        ]
+
+    def __str__(self) -> str:
+        """String representation of the Service."""
+        return f"{self.name} by {self.provider.company_name}"
+
+    def get_price_range_display(self):
+        """
+        Get formatted price range display.
+        
+        Returns:
+            str: Formatted price range with currency symbol
+        """
+        return f"₦{self.min_price:,.2f} - ₦{self.max_price:,.2f}"
+
+    def get_average_price(self):
+        """
+        Get average price of the service.
+        
+        Returns:
+            Decimal: Average of min and max price
+        """
+        return (self.min_price + self.max_price) / 2
+
+    def is_available(self):
+        """
+        Check if service is available.
+        
+        Returns:
+            bool: True if service is active, False otherwise
+        """
+        return self.is_active
+
+    def get_subservices_count(self):
+        """
+        Get count of active subservices.
+        
+        Returns:
+            int: Number of active subservices
+        """
+        return self.sub_services.filter(is_active=True).count()
+
+    def get_total_bookings(self):
+        """
+        Get total number of bookings for this service.
+        
+        Returns:
+            int: Total number of bookings
+        """
+        return self.bookings.count()
+
+    @classmethod
+    def get_services_by_category(cls, category):
+        """
+        Get services by category.
+        
+        Args:
+            category: Service category
+            
+        Returns:
+            QuerySet: Services in the specified category
+        """
+        return cls.objects.filter(category=category, is_active=True)
+
+    @classmethod
+    def get_services_by_provider(cls, provider):
+        """
+        Get services by provider.
+        
+        Args:
+            provider: ServiceProvider instance
+            
+        Returns:
+            QuerySet: Services offered by the provider
+        """
+        return cls.objects.filter(provider=provider, is_active=True)
+
 
 class SubService(models.Model):
-    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="sub_services")
-    name = models.CharField(max_length=255)
-    description = models.TextField()
-    price = models.DecimalField(max_digits=16, decimal_places=2)
-    image = models.URLField(null=True, blank=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    """
+    Model representing a sub-service under a main service.
+    
+    Manages sub-service information including pricing,
+    availability status, and parent service details.
+    """
+    service = models.ForeignKey(
+        Service, 
+        on_delete=models.CASCADE, 
+        related_name="sub_services",
+        help_text="Main service this sub-service belongs to"
+    )
+    name = models.CharField(
+        max_length=255, 
+        help_text="Name of the sub-service"
+    )
+    description = models.TextField(
+        help_text="Detailed description of the sub-service"
+    )
+    price = models.DecimalField(
+        max_digits=16, 
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        help_text="Price for the sub-service"
+    )
+    image = models.URLField(
+        null=True, 
+        blank=True, 
+        help_text="URL to an image representing the sub-service"
+    )
+    is_active = models.BooleanField(
+        default=True, 
+        help_text="Whether the sub-service is currently active"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the sub-service was created"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        help_text="When the sub-service was last updated"
+    )
 
-    def __str__(self):
-        return f"{self.name} under {self.service.name}"
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Sub Service"
+        verbose_name_plural = "Sub Services"
+        indexes = [
+            models.Index(fields=['service', '-created_at']),
+            models.Index(fields=['is_active']),
+            models.Index(fields=['price']),
+        ]
+
+    def __str__(self) -> str:
+        """String representation of the SubService."""
+        return f"{self.name} - ₦{self.price:,.2f}"
+
+    def get_price_display(self):
+        """
+        Get formatted price display.
+        
+        Returns:
+            str: Formatted price with currency symbol
+        """
+        return f"₦{self.price:,.2f}"
+
+    def is_available(self):
+        """
+        Check if subservice is available.
+        
+        Returns:
+            bool: True if subservice is active, False otherwise
+        """
+        return self.is_active and self.service.is_active
+
+    def get_service_name(self):
+        """
+        Get parent service name.
+        
+        Returns:
+            str: Name of the parent service
+        """
+        return self.service.name
+
+    @classmethod
+    def get_subservices_by_service(cls, service):
+        """
+        Get subservices by parent service.
+        
+        Args:
+            service: Service instance
+            
+        Returns:
+            QuerySet: Subservices belonging to the service
+        """
+        return cls.objects.filter(service=service, is_active=True)
 
 
 class ServiceRequest(models.Model):
+    """
+    Model representing a user's request for a service.
+    
+    Manages service request information including user details,
+    pricing, categories, and status tracking.
+    """
     STATUS_CHOICES = [
-        ('Pending', 'Pending'),
-        ('In Progress', 'In Progress'),
-        ('Completed', 'Completed'),
-        ('Cancelled', 'Cancelled'),
+        ('pending', 'Pending'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+        ('awarded', 'Awarded'),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="service_requests")
-    title = models.CharField(max_length=255)
-    description = models.TextField()
-    image = models.URLField(null=True, blank=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    category = models.CharField(max_length=100, choices=CATEGORIES)  # Updated to use choices
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name="service_requests",
+        help_text="User who made the service request"
+    )
+    title = models.CharField(
+        max_length=255, 
+        help_text="Title of the service request"
+    )
+    description = models.TextField(
+        help_text="Detailed description of the service request"
+    )
+    image = models.URLField(
+        null=True, 
+        blank=True, 
+        help_text="URL to an image for the request (optional)"
+    )
+    price = models.DecimalField(
+        max_digits=16, 
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        help_text="Budget for the service request"
+    )
+    category = models.CharField(
+        max_length=100, 
+        choices=CATEGORIES, 
+        help_text="Category of the requested service"
+    )
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='pending', 
+        help_text="Current status of the request"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the service request was created"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        help_text="When the service request was last updated"
+    )
 
-    def __str__(self):
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Service Request"
+        verbose_name_plural = "Service Requests"
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['category', 'status']),
+            models.Index(fields=['price']),
+        ]
+
+    def __str__(self) -> str:
+        """String representation of the ServiceRequest."""
         return f"{self.title} by {self.user.email} - {self.status}"
 
+    def get_price_display(self):
+        """
+        Get formatted price display.
+        
+        Returns:
+            str: Formatted price with currency symbol
+        """
+        return f"₦{self.price:,.2f}"
+
+    def is_open_for_bids(self):
+        """
+        Check if request is open for bids.
+        
+        Returns:
+            bool: True if request is open for bids, False otherwise
+        """
+        return self.status in ['pending', 'in_progress']
+
+    def get_bids_count(self):
+        """
+        Get count of bids for this request.
+        
+        Returns:
+            int: Number of bids
+        """
+        return self.bids.count()
+
+    def get_accepted_bid(self):
+        """
+        Get the accepted bid for this request.
+        
+        Returns:
+            ServiceRequestBid: Accepted bid or None
+        """
+        return self.bids.filter(status='accepted').first()
+
+    def can_be_cancelled(self):
+        """
+        Check if request can be cancelled.
+        
+        Returns:
+            bool: True if request can be cancelled, False otherwise
+        """
+        return self.status in ['pending', 'in_progress']
+
+    @classmethod
+    def get_requests_by_user(cls, user):
+        """
+        Get requests by user.
+        
+        Args:
+            user: User instance
+            
+        Returns:
+            QuerySet: Requests made by the user
+        """
+        return cls.objects.filter(user=user)
+
+    @classmethod
+    def get_requests_by_category(cls, category):
+        """
+        Get requests by category.
+        
+        Args:
+            category: Request category
+            
+        Returns:
+            QuerySet: Requests in the specified category
+        """
+        return cls.objects.filter(category=category, status='pending')
+
+
 class ServiceRequestBid(models.Model):
+    """
+    Model representing a bid on a service request by a provider.
+    
+    Manages bid information including pricing, status tracking,
+    and provider details.
+    """
     STATUS_CHOICES = [
-        ('Pending', 'Pending'),
-        ('Accepted', 'Accepted'),
-        ('Rejected', 'Rejected'),
-        ('Withdrawn', 'Withdrawn'),
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+        ('withdrawn', 'Withdrawn'),
     ]
 
-    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE, related_name="bids")
-    service_provider = models.ForeignKey(User, on_delete=models.CASCADE, related_name="bids")
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
-    message = models.TextField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    service_request = models.ForeignKey(
+        ServiceRequest, 
+        on_delete=models.CASCADE, 
+        related_name="bids",
+        help_text="Service request being bid on"
+    )
+    provider = models.ForeignKey(
+        ServiceProvider, 
+        on_delete=models.CASCADE, 
+        related_name="bids",
+        help_text="Provider making the bid"
+    )
+    amount = models.DecimalField(
+        max_digits=16, 
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        help_text="Bid amount offered by the provider"
+    )
+    proposal = models.TextField(
+        help_text="Proposal message from the provider"
+    )
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='pending', 
+        help_text="Current status of the bid"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the bid was created"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        help_text="When the bid was last updated"
+    )
 
-    def __str__(self):
-        return f"Bid by {self.service_provider.email} - {self.service_request.title} - {self.status}"
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Service Request Bid"
+        verbose_name_plural = "Service Request Bids"
+        indexes = [
+            models.Index(fields=['service_request', '-created_at']),
+            models.Index(fields=['provider', 'status']),
+            models.Index(fields=['amount']),
+        ]
+
+    def __str__(self) -> str:
+        """String representation of the ServiceRequestBid."""
+        return f"Bid by {self.provider.company_name} for {self.service_request.title} - {self.status}"
+
+    def get_amount_display(self):
+        """
+        Get formatted amount display.
+        
+        Returns:
+            str: Formatted amount with currency symbol
+        """
+        return f"₦{self.amount:,.2f}"
+
+    def is_accepted(self):
+        """
+        Check if bid is accepted.
+        
+        Returns:
+            bool: True if bid is accepted, False otherwise
+        """
+        return self.status == 'accepted'
+
+    def can_be_accepted(self):
+        """
+        Check if bid can be accepted.
+        
+        Returns:
+            bool: True if bid can be accepted, False otherwise
+        """
+        return self.status == 'pending'
+
+    def can_be_rejected(self):
+        """
+        Check if bid can be rejected.
+        
+        Returns:
+            bool: True if bid can be rejected, False otherwise
+        """
+        return self.status == 'pending'
+
+    @classmethod
+    def get_bids_by_request(cls, service_request):
+        """
+        Get bids by service request.
+        
+        Args:
+            service_request: ServiceRequest instance
+            
+        Returns:
+            QuerySet: Bids for the service request
+        """
+        return cls.objects.filter(service_request=service_request)
+
+    @classmethod
+    def get_bids_by_provider(cls, provider):
+        """
+        Get bids by provider.
+        
+        Args:
+            provider: ServiceProvider instance
+            
+        Returns:
+            QuerySet: Bids made by the provider
+        """
+        return cls.objects.filter(provider=provider)
 
 
 class Booking(models.Model):
+    """
+    Model representing a booking for a service.
+    
+    Manages booking information including user and provider details,
+    pricing, status tracking, and feedback.
+    """
     STATUS_CHOICES = [
-        ('Pending', 'Pending'),
-        ('In Progress', 'In Progress'),
-        ('Completed', 'Completed'),
-        ('Cancelled', 'Cancelled'),
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
     ]
 
-    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE, related_name="booking")
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="bookings_as_user")
-    service_provider = models.ForeignKey(User, on_delete=models.CASCADE, related_name="bookings_as_provider")
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    user_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
-    provider_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
-    feedback = models.TextField(null=True, blank=True)
-    rating = models.PositiveSmallIntegerField(null=True, blank=True)  # 1 to 5 rating
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name="bookings_as_user",
+        help_text="User who made the booking"
+    )
+    service = models.ForeignKey(
+        Service, 
+        on_delete=models.CASCADE, 
+        related_name="bookings",
+        help_text="Service being booked"
+    )
+    provider = models.ForeignKey(
+        ServiceProvider, 
+        on_delete=models.CASCADE, 
+        related_name="bookings",
+        help_text="Service provider for the booking"
+    )
+    amount = models.DecimalField(
+        max_digits=16, 
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        help_text="Agreed amount for the booking"
+    )
+    booking_date = models.DateField(
+        help_text="Date for the service booking"
+    )
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='pending', 
+        help_text="Current status of the booking"
+    )
+    notes = models.TextField(
+        null=True, 
+        blank=True, 
+        help_text="Additional notes for the booking"
+    )
+    feedback = models.TextField(
+        null=True, 
+        blank=True, 
+        help_text="Feedback from the user or provider"
+    )
+    rating = models.PositiveSmallIntegerField(
+        null=True, 
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Rating given by the user (1-5)"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the booking was created"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        help_text="When the booking was last updated"
+    )
 
-    def __str__(self):
-        return f"Booking: {self.service_request.title} - {self.user.email} & {self.service_provider.email}"
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Booking"
+        verbose_name_plural = "Bookings"
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['provider', 'status']),
+            models.Index(fields=['service', 'booking_date']),
+            models.Index(fields=['status']),
+        ]
+
+    def __str__(self) -> str:
+        """String representation of the Booking."""
+        return f"Booking: {self.service.name} - {self.user.email} & {self.provider.company_name}"
+
+    def get_amount_display(self):
+        """
+        Get formatted amount display.
+        
+        Returns:
+            str: Formatted amount with currency symbol
+        """
+        return f"₦{self.amount:,.2f}"
+
+    def is_confirmed(self):
+        """
+        Check if booking is confirmed.
+        
+        Returns:
+            bool: True if booking is confirmed, False otherwise
+        """
+        return self.status == 'confirmed'
+
+    def is_completed(self):
+        """
+        Check if booking is completed.
+        
+        Returns:
+            bool: True if booking is completed, False otherwise
+        """
+        return self.status == 'completed'
+
+    def can_be_cancelled(self):
+        """
+        Check if booking can be cancelled.
+        
+        Returns:
+            bool: True if booking can be cancelled, False otherwise
+        """
+        return self.status in ['pending', 'confirmed']
+
+    def get_rating_display(self):
+        """
+        Get formatted rating display.
+        
+        Returns:
+            str: Formatted rating or 'No rating'
+        """
+        if self.rating:
+            return f"{self.rating}/5 stars"
+        return "No rating"
+
+    @classmethod
+    def get_bookings_by_user(cls, user):
+        """
+        Get bookings by user.
+        
+        Args:
+            user: User instance
+            
+        Returns:
+            QuerySet: Bookings made by the user
+        """
+        return cls.objects.filter(user=user)
+
+    @classmethod
+    def get_bookings_by_provider(cls, provider):
+        """
+        Get bookings by provider.
+        
+        Args:
+            provider: ServiceProvider instance
+            
+        Returns:
+            QuerySet: Bookings for the provider
+        """
+        return cls.objects.filter(provider=provider)
+
+    @classmethod
+    def get_bookings_by_service(cls, service):
+        """
+        Get bookings by service.
+        
+        Args:
+            service: Service instance
+            
+        Returns:
+            QuerySet: Bookings for the service
+        """
+        return cls.objects.filter(service=service)
+
 

@@ -1,11 +1,13 @@
+"""
+User app views for handling user-related operations.
+
+This module contains views for user dashboard, profile management, KYC operations,
+and other user-specific functionality.
+"""
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, DatabaseError
 from django.utils import timezone
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-
-from decouple import config
-
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -14,20 +16,27 @@ from rest_framework.authentication import TokenAuthentication
 
 from auth_app.models import KYC
 from auth_app.serializers import KYCSerializer
-from auth_app.utils import log_to_server, upload_to_cloudinary, write_to_file
+from decouple import config
+from auth_app.utils import upload_to_cloudinary
 from auth_app.views import get_user_from_token
 from notification_app.models import Notification
+from provider_app.models import ServiceProvider
 from wallet_app.models import Wallet, Transaction
 from wallet_app.serializers import TransactionSerializer
 
 import logging
-
 
 logger = logging.getLogger(__name__)
 
 
 
 class DashboardView(APIView):
+    """
+    Dashboard view for authenticated users.
+    
+    Returns user details, wallet information, recent transactions,
+    and notification status.
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -74,12 +83,30 @@ class DashboardView(APIView):
         except Exception as e:
             has_unread_notifications = False
 
+        try:
+            has_business_profile = ServiceProvider.objects.filter(user=user).exists()
+        except Exception as e:
+            has_business_profile = False
+
+        # Check if user profile is complete
+        required_fields = [
+            user.first_name,
+            user.last_name,
+            user.email,
+            user.phone_number,
+            user.state,
+            user.profile_picture
+        ]
+        is_profile_complete = all(bool(field) for field in required_fields)
+
             # Combine data into response
         response_data = {
             "user_details": user_data,
             "wallet_details": wallet_data,
             "recent_transactions": transactions_data,
             "has_unread_notifications": has_unread_notifications,
+            "has_business_profile": has_business_profile,
+            "is_profile_complete": is_profile_complete,
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
@@ -87,6 +114,12 @@ class DashboardView(APIView):
 
 
 class GetKYCDetailsView(APIView):
+    """
+    Retrieve KYC details for the authenticated user.
+    
+    Returns the user's KYC information including verification status
+    and document details.
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -116,6 +149,12 @@ class GetKYCDetailsView(APIView):
 
 
 class UpdateUserProfileView(APIView):
+    """
+    Update user profile information.
+    
+    Allows users to update their phone number, state, and profile picture.
+    Creates a notification when profile is successfully updated.
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -172,6 +211,12 @@ class UpdateUserProfileView(APIView):
 
 
 class UpdateKYCView(APIView):
+    """
+    Update KYC information for the authenticated user.
+    
+    Handles KYC document uploads and updates verification status.
+    Supports partial updates of KYC information.
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated] # Uncomment and set this up as needed
 
@@ -236,6 +281,12 @@ class UpdateKYCView(APIView):
 
 
 class ChangePasswordView(APIView):
+    """
+    Change user password.
+    
+    Allows authenticated users to change their password.
+    Validates old password before allowing the change.
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -272,6 +323,11 @@ class ChangePasswordView(APIView):
 
 
 class GetReferralCode(APIView):
+    """
+    Get user's referral code.
+    
+    Returns the unique referral code for the authenticated user.
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 

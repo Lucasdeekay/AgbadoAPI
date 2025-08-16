@@ -5,7 +5,7 @@ from .views import CreateServiceProviderView, EditServiceProviderView, GetServic
 from .viewsets import ServiceProviderViewSet
 
 router = DefaultRouter()
-router.register(r'providers', ServiceProviderViewSet)
+router.register(r'providers', ServiceProviderViewSet, basename='provider')
 
 urlpatterns = [
     path("create/", CreateServiceProviderView.as_view(), name="create_service_provider"),
