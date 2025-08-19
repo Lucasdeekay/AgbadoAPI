@@ -21,7 +21,7 @@ import datetime as _dt
 import uuid
 from typing import Dict, List, Optional
 
-from monnify import Monnify  # our low-level client
+from .monnify import Monnify  # our low-level client
 
 # --------------------------------------------------------------------------- #
 #                               Exceptions                                    #

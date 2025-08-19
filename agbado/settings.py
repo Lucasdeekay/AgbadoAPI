@@ -340,3 +340,8 @@ WEBAUTHN_RP_ID = config('WEBAUTHN_RP_ID', default="localhost") # Use config for 
 WEBAUTHN_RP_NAME = config('WEBAUTHN_RP_NAME', default="AGBA-DO") # Use config for flexibility
 WEBAUTHN_ORIGINS = config('WEBAUTHN_ORIGINS', cast=lambda v: [s.strip() for s in v.split(',')], default="http://localhost:8000,http://127.0.0.1:8000") # Use config for flexibility
 
+# Monnify Configuration
+MONNIFY_SANDBOX = config("MONNIFY_SANDBOX")
+MONNIFY_API_KEY= config("MONNIFY_API_KEY")
+MONNIFY_SECRET_KEY= config("MONNIFY_SECRET_KEY")
+MONNIFY_CONTRACT_CODE= config("MONNIFY_CONTRACT_CODE")

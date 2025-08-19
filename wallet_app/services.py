@@ -5,17 +5,18 @@ import os
 from decimal import Decimal
 from typing import Dict
 
-from monnify import MonnifyError
-from monnify_service import DedicatedAccountService   # the file we built earlier
+from agbado import settings
+
+from .monnify import MonnifyError
+from .monnify_service import DedicatedAccountService   # the file we built earlier
 from wallet_app.models import Wallet, Transaction, Withdrawal, Bank
 from auth_app.models import User
 
 # ---- singleton service instance ---- #
-MONNIFY_SANDBOX = True
 DEDICATED_SERVICE = DedicatedAccountService(
-    api_key=os.environ["MONNIFY_API_KEY"],
-    secret=os.environ["MONNIFY_SECRET_KEY"],
-    sandbox=MONNIFY_SANDBOX,
+    api_key=settings.MONNIFY_API_KEY,
+    secret=settings.MONNIFY_SECRET_KEY,
+    sandbox=settings.MONNIFY_SANDBOX,
 )
 
 # ---- helper to map Monnify bank → local Bank instance ---- #
