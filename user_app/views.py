@@ -52,7 +52,9 @@ class DashboardView(APIView):
                 "phone_number": user.phone_number,
                 "state": user.state,
                 "is_verified": user.is_verified,
-                "paystack_key": config('PAYSTACK_SECRET_KEY'),
+                "monnify_key": config('MONNIFY_API_KEY'),
+                "monnify_secret_key": config('MONNIFY_SECRET_KEY'),
+                "monnify_contract_code": config('MONNIFY_CONTRACT_CODE'),
                 "profile_picture": user.profile_picture,
             }
         except Exception as e:
