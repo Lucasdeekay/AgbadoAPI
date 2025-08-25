@@ -2,7 +2,7 @@ import secrets
 import string
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from auth.models import User  # adjust import if User lives elsewhere
+from auth_app.models import User  # adjust import if User lives elsewhere
 
 
 def _generate_code(length=8) -> str:
