@@ -126,3 +126,34 @@ def update_bvn_on_reserved_account(user: User, bvn: str) -> None:
         )
     except MonnifyError as e:
         raise ValueError(str(e))
+    
+
+def get_active_banks() -> Dict[str, str]:
+    """
+    Fetches the list of active banks from the local DB.
+    """
+    try:
+        banks = DEDICATED_SERVICE.fetch_banks(token=DEDICATED_SERVICE._ensure_token())
+        for bank in banks.get("banks", []):
+            _get_or_create_bank(bank_name=bank["name"], bank_code=bank["code"])
+
+        active_banks = Bank.objects.filter(is_active=True).values("name", "code")
+        return {bank["name"]: bank["code"] for bank in active_banks}
+    except MonnifyError as e:
+        raise ValueError(str(e))
+    
+
+def validate_account_details(bank_code: str, account_number: str) -> str:
+    """
+    Validates the account number and bank code via Monnify.
+    Returns the account name if valid, else raises ValueError.
+    """
+    try:
+        account_details = DEDICATED_SERVICE.validate_account(
+            token=DEDICATED_SERVICE._ensure_token(),
+            bank_code=bank_code,
+            account_number=account_number,
+        )
+        return account_details
+    except MonnifyError as e:
+        raise ValueError(str(e))

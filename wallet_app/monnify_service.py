@@ -322,6 +322,43 @@ class DedicatedAccountService:
             )
         except Exception as exc:
             raise DedicatedAccountError(f"Failed to update BVN: {exc}")
+        
+    def fetch_banks(self) -> List[Dict]:
+        """
+        Fetch the list of banks supported by Monnify.
+
+        Returns
+        -------
+        List of Dicts with keys: name, code
+        """
+        token = self._ensure_token()
+        resp = self._client.get_banks(token)
+        banks = resp["responseBody"]
+        return [{"name": bank["bankName"], "code": bank["bankCode"]} for bank in banks]
+    
+    def validate_account(self, account_number: str, bank_code: str) -> Dict:
+        """
+        Validate a bank account number with the given bank code.
+
+        Parameters
+        ----------
+        account_number : str
+            The bank account number to validate.
+        bank_code : str
+            The bank code corresponding to the bank.
+
+        Returns
+        -------
+        Dict with keys: account_name, account_number, bank_code
+        """
+        token = self._ensure_token()
+        resp = self._client.validate_account(token, account_number=account_number, bank_code=bank_code)
+        body = resp["responseBody"]
+        return {
+            "account_name": body["accountName"],
+            "account_number": body["accountNumber"],
+            "bank_code": body["bankCode"],
+        }
 
 
 # --------------------------------------------------------------------------- #

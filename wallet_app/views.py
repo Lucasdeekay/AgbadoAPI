@@ -43,6 +43,8 @@ from wallet_app.services import (
     create_dedicated_account_for_user,
     fetch_balance_from_monnify,
     initiate_withdrawal,
+    get_active_banks,
+    validate_account_details,
 )
 from wallet_app.models import Wallet, Transaction, Withdrawal
 from wallet_app.serializers import (
@@ -431,3 +433,28 @@ class MonnifyWebhookView(APIView):
                 logger.error(f"Error handling transfer.reversed for {reference}: {e}")
                 raise
 
+
+class FetchBanksView(APIView):
+    authentication_classes = [] # No authentication for webhooks
+    permission_classes = []     # No permissions for webhooks
+
+    def post(self, request, *args, **kwargs):
+        bank_list = get_active_banks()
+        return Response({"banks": bank_list}, status=status.HTTP_200_OK)
+    
+class ValidateAccountView(APIView):
+    authentication_classes = [] # No authentication for webhooks
+    permission_classes = []     # No permissions for webhooks
+
+    def post(self, request, *args, **kwargs):
+        account_number = request.data.get("account_number")
+        bank_code = request.data.get("bank_code")
+
+        if not account_number or not bank_code:
+            return Response({"message": "account_number and bank_code are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            account_details = validate_account_details(account_number=account_number, bank_code=bank_code)
+            return Response({"account_details": account_details}, status=status.HTTP_200_OK)
+        except ValueError as e:
+            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)

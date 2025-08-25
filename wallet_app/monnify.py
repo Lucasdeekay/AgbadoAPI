@@ -557,7 +557,7 @@ class Monnify:
     # ========================= #
     #  BANKS & UTILITIES        #
     # ========================= #
-    def banks(self, token: str) -> dict:
+    def get_banks(self, token: str) -> dict:
         """
         GET /api/v1/banks
         """
