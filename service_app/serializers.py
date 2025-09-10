@@ -245,7 +245,10 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
             'title': {'required': True},
             'description': {'required': True},
             'category': {'required': True},
-            'price': {'required': True}
+            'price': {'required': True},
+            'latitude': {'required': True},
+            'longitude': {'required': True},
+            'address': {'required': True}
         }
 
     def get_image(self, obj):
@@ -359,6 +362,7 @@ class ServiceRequestBidSerializer(serializers.ModelSerializer):
     """
     service_provider = serializers.SerializerMethodField()
     service_request = serializers.SerializerMethodField()
+    distance_km = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceRequestBid
@@ -368,8 +372,18 @@ class ServiceRequestBidSerializer(serializers.ModelSerializer):
             'service_provider': {'required': True},
             'service_request': {'required': True},
             'bid_amount': {'required': True},
-            'proposal': {'required': True}
+            'proposal': {'required': True},
+            'latitude': {'required': True},
+            'longitude': {'required': True},
+            'address': {'required': True}
         }
+
+    def get_distance_km(self, obj):
+        """
+        Return distance in kilometers between bid and request.
+        """
+        distance = obj.calculate_distance_km()
+        return distance if distance is not None else None
 
     def get_service_provider(self, obj):
         """
