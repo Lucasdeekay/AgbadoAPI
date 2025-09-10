@@ -141,7 +141,7 @@ class ServiceRequestBidViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filterset_fields = ['service_request', 'service_provider', 'status']
-    ordering_fields = ['created_at', 'price']
+    ordering_fields = ['created_at', 'amount']
     ordering = ['-created_at']
     permission_classes = [IsAuthenticated]
 
@@ -164,6 +164,20 @@ class ServiceRequestBidViewSet(viewsets.ModelViewSet):
         request_title = instance.service_request.title
         instance.delete()
         logger.info(f"Bid deleted for service request: {request_title}")
+
+    @action(detail=False, methods=['get'])
+    def nearest(self, request):
+        """
+        Return bids ordered by nearest distance to their service request.
+        """
+        queryset = self.get_queryset()
+        bids_with_distance = sorted(
+            queryset,
+            key=lambda bid: bid.calculate_distance_km() or float('inf')
+        )
+        page = self.paginate_queryset(bids_with_distance)
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
 
 
 class BookingViewSet(viewsets.ModelViewSet):
