@@ -234,7 +234,7 @@ class ServiceRequestAdmin(admin.ModelAdmin):
     list_display = (
         'get_title_display', 'get_user_email', 'get_category_display',
         'get_price_display', 'get_status_display', 'get_bids_count',
-        'created_at'
+        'latitude', 'longitude', 'created_at'
     )
     list_filter = (
         'status', 'category', 'created_at', 'user__state'
@@ -248,6 +248,9 @@ class ServiceRequestAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Basic Information', {
             'fields': ('user', 'title', 'description', 'category')
+        }),
+        ('Location', {
+            'fields': ('address', 'latitude', 'longitude'),
         }),
         ('Pricing', {
             'fields': ('price',)
@@ -363,7 +366,7 @@ class ServiceRequestBidAdmin(admin.ModelAdmin):
     """
     list_display = (
         'get_request_title', 'get_provider_name', 'get_amount_display',
-        'get_status_display', 'created_at'
+        'get_status_display', 'get_distance_display', 'created_at'
     )
     list_filter = (
         'status', 'created_at', 'provider__business_category'
@@ -379,6 +382,9 @@ class ServiceRequestBidAdmin(admin.ModelAdmin):
         ('Basic Information', {
             'fields': ('service_request', 'provider', 'amount', 'proposal')
         }),
+        ('Location', {
+            'fields': ('address', 'latitude', 'longitude'),
+        }),
         ('Status', {
             'fields': ('status',)
         }),
@@ -388,6 +394,20 @@ class ServiceRequestBidAdmin(admin.ModelAdmin):
         }),
     )
     actions = ['accept_bids', 'reject_bids', 'withdraw_bids']
+
+    def get_distance_display(self, obj):
+        """Show distance between bid and request."""
+        distance = obj.calculate_distance_km()
+        if distance is not None:
+            return format_html(
+                '<span style="color: #007bff; font-weight: bold;">{} km</span>',
+                distance
+            )
+        return format_html(
+            '<span style="color: #6c757d;">N/A</span>'
+        )
+    get_distance_display.short_description = "Distance"
+
 
     def get_request_title(self, obj):
         """Get service request title."""
