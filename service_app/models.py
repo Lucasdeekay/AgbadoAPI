@@ -322,6 +322,19 @@ class ServiceRequest(models.Model):
         default='pending', 
         help_text="Current status of the request"
     )
+    # Location fields
+    latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Latitude of the service request location"
+    )
+    longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Longitude of the service request location"
+    )
+    address = models.CharField(
+        max_length=500, null=True, blank=True,
+        help_text="Address of the service request location"
+    )
     created_at = models.DateTimeField(
         auto_now_add=True, 
         help_text="When the service request was created"
@@ -389,6 +402,23 @@ class ServiceRequest(models.Model):
             bool: True if request can be cancelled, False otherwise
         """
         return self.status in ['pending', 'in_progress']
+
+    def get_bids_ordered_by_distance(self):
+        """
+        Get all bids for this service request ordered by nearest distance.
+        
+        Returns:
+            list: List of tuples (bid, distance_in_km), sorted by distance.
+        """
+        bids_with_distance = []
+        for bid in self.bids.all():
+            distance = bid.calculate_distance_km()
+            if distance is not None:
+                bids_with_distance.append((bid, distance))
+
+        # Sort by distance
+        bids_with_distance.sort(key=lambda x: x[1])
+        return bids_with_distance
 
     @classmethod
     def get_requests_by_user(cls, user):
@@ -458,6 +488,19 @@ class ServiceRequestBid(models.Model):
         default='pending', 
         help_text="Current status of the bid"
     )
+    # Location fields
+    latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Latitude of the bid location"
+    )
+    longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Longitude of the bid location"
+    )
+    address = models.CharField(
+        max_length=500, null=True, blank=True,
+        help_text="Address of the bid location"
+    )
     created_at = models.DateTimeField(
         auto_now_add=True, 
         help_text="When the bid was created"
@@ -516,6 +559,38 @@ class ServiceRequestBid(models.Model):
             bool: True if bid can be rejected, False otherwise
         """
         return self.status == 'pending'
+
+    def calculate_distance_km(self):
+        """
+        Calculate distance in kilometers between 
+        the service request and the bid location using the Haversine formula.
+        
+        Returns:
+            float: Distance in kilometers, or None if location data is missing
+        """
+        if not (self.latitude and self.longitude and 
+                self.service_request.latitude and self.service_request.longitude):
+            return None
+
+        # Convert to floats
+        lat1 = float(self.latitude)
+        lon1 = float(self.longitude)
+        lat2 = float(self.service_request.latitude)
+        lon2 = float(self.service_request.longitude)
+
+        # Radius of Earth in km
+        R = 6371  
+
+        # Convert degrees to radians
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = (math.sin(dlat / 2) ** 2 +
+             math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+             math.sin(dlon / 2) ** 2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        distance = R * c
+        return round(distance, 2)
 
     @classmethod
     def get_bids_by_request(cls, service_request):
