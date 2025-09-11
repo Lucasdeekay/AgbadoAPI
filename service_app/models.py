@@ -621,10 +621,10 @@ class ServiceRequestBid(models.Model):
 
 class Booking(models.Model):
     """
-    Model representing a booking for a service.
+    Model representing a booking for a service request bid.
     
-    Manages booking information including user and provider details,
-    pricing, status tracking, and feedback.
+    Tied directly to a specific bid, which already links the 
+    service request and provider details.
     """
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -635,60 +635,57 @@ class Booking(models.Model):
     ]
 
     user = models.ForeignKey(
-        User, 
-        on_delete=models.CASCADE, 
+        User,
+        on_delete=models.CASCADE,
         related_name="bookings_as_user",
         help_text="User who made the booking"
     )
-    service = models.ForeignKey(
-        Service, 
-        on_delete=models.CASCADE, 
-        related_name="bookings",
-        help_text="Service being booked"
+    bid = models.OneToOneField(  # 👈 ensures a bid can only lead to one booking
+        ServiceRequestBid,
+        on_delete=models.CASCADE,
+        related_name="booking",
+        help_text="The accepted bid for this booking"
     )
     provider = models.ForeignKey(
-        ServiceProvider, 
-        on_delete=models.CASCADE, 
+        ServiceProvider,
+        on_delete=models.CASCADE,
         related_name="bookings",
-        help_text="Service provider for the booking"
+        help_text="Service provider handling the booking"
     )
-    amount = models.DecimalField(
-        max_digits=16, 
+    amount = models.DecimalField(  # 👈 optional if you want to store snapshot at booking time
+        max_digits=16,
         decimal_places=2,
         validators=[MinValueValidator(0.01)],
         help_text="Agreed amount for the booking"
     )
-    booking_date = models.DateField(
-        help_text="Date for the service booking"
-    )
     status = models.CharField(
-        max_length=20, 
-        choices=STATUS_CHOICES, 
-        default='pending', 
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
         help_text="Current status of the booking"
     )
     notes = models.TextField(
-        null=True, 
-        blank=True, 
+        null=True,
+        blank=True,
         help_text="Additional notes for the booking"
     )
     feedback = models.TextField(
-        null=True, 
-        blank=True, 
+        null=True,
+        blank=True,
         help_text="Feedback from the user or provider"
     )
     rating = models.PositiveSmallIntegerField(
-        null=True, 
+        null=True,
         blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(5)],
         help_text="Rating given by the user (1-5)"
     )
     created_at = models.DateTimeField(
-        auto_now_add=True, 
+        auto_now_add=True,
         help_text="When the booking was created"
     )
     updated_at = models.DateTimeField(
-        auto_now=True, 
+        auto_now=True,
         help_text="When the booking was last updated"
     )
 
@@ -699,98 +696,37 @@ class Booking(models.Model):
         indexes = [
             models.Index(fields=['user', '-created_at']),
             models.Index(fields=['provider', 'status']),
-            models.Index(fields=['service', 'booking_date']),
             models.Index(fields=['status']),
         ]
 
     def __str__(self) -> str:
         """String representation of the Booking."""
-        return f"Booking: {self.service.name} - {self.user.email} & {self.provider.company_name}"
+        return f"Booking for {self.bid.service_request.title} by {self.user.email}"
 
     def get_amount_display(self):
-        """
-        Get formatted amount display.
-        
-        Returns:
-            str: Formatted amount with currency symbol
-        """
         return f"₦{self.amount:,.2f}"
 
     def is_confirmed(self):
-        """
-        Check if booking is confirmed.
-        
-        Returns:
-            bool: True if booking is confirmed, False otherwise
-        """
         return self.status == 'confirmed'
 
     def is_completed(self):
-        """
-        Check if booking is completed.
-        
-        Returns:
-            bool: True if booking is completed, False otherwise
-        """
         return self.status == 'completed'
 
     def can_be_cancelled(self):
-        """
-        Check if booking can be cancelled.
-        
-        Returns:
-            bool: True if booking can be cancelled, False otherwise
-        """
         return self.status in ['pending', 'confirmed']
 
     def get_rating_display(self):
-        """
-        Get formatted rating display.
-        
-        Returns:
-            str: Formatted rating or 'No rating'
-        """
         if self.rating:
             return f"{self.rating}/5 stars"
         return "No rating"
 
     @classmethod
     def get_bookings_by_user(cls, user):
-        """
-        Get bookings by user.
-        
-        Args:
-            user: User instance
-            
-        Returns:
-            QuerySet: Bookings made by the user
-        """
         return cls.objects.filter(user=user)
 
     @classmethod
     def get_bookings_by_provider(cls, provider):
-        """
-        Get bookings by provider.
-        
-        Args:
-            provider: ServiceProvider instance
-            
-        Returns:
-            QuerySet: Bookings for the provider
-        """
         return cls.objects.filter(provider=provider)
 
-    @classmethod
-    def get_bookings_by_service(cls, service):
-        """
-        Get bookings by service.
-        
-        Args:
-            service: Service instance
-            
-        Returns:
-            QuerySet: Bookings for the service
-        """
-        return cls.objects.filter(service=service)
 
 
