@@ -183,33 +183,55 @@ class ServiceRequestBidViewSet(viewsets.ModelViewSet):
 class BookingViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Booking model.
-    
+
     Provides CRUD operations for bookings with user-specific filtering.
     """
     serializer_class = BookingSerializer
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend, OrderingFilter)
-    filterset_fields = ['service_request', 'user', 'service_provider', 'user_status', 'provider_status']
-    ordering_fields = ['created_at', 'user_status', 'provider_status']
+    filterset_fields = ['bid', 'user', 'provider', 'status']
+    ordering_fields = ['created_at', 'status']
     ordering = ['-created_at']
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Return bookings for the authenticated user only."""
-        return Booking.objects.filter(user=self.request.user)
+        """
+        Return bookings for the authenticated user.
+        If the user is a provider, return bookings for their services.
+        """
+        user = self.request.user
+        if hasattr(user, "serviceprovider"):  # provider
+            return Booking.objects.filter(provider=user.serviceprovider)
+        return Booking.objects.filter(user=user)  # regular user
 
     def perform_create(self, serializer):
-        """Log booking creation."""
-        booking = serializer.save()
-        logger.info(f"Booking created for service request: {booking.service_request.title}")
+        """
+        Auto-populate user, provider, and amount from the bid when creating a booking.
+        """
+        bid = serializer.validated_data.get("bid")
+
+        booking = serializer.save(
+            user=self.request.user,
+            provider=bid.provider,
+            amount=bid.amount
+        )
+
+        logger.info(
+            f"Booking created for bid {bid.id} "
+            f"(service request: {bid.service_request.title})"
+        )
 
     def perform_update(self, serializer):
         """Log booking updates."""
         booking = serializer.save()
-        logger.info(f"Booking updated for service request: {booking.service_request.title}")
+        logger.info(
+            f"Booking updated for bid {booking.bid.id} "
+            f"(service request: {booking.bid.service_request.title})"
+        )
 
     def perform_destroy(self, instance):
         """Log booking deletion."""
-        request_title = instance.service_request.title
+        request_title = instance.bid.service_request.title
         instance.delete()
         logger.info(f"Booking deleted for service request: {request_title}")
+
