@@ -334,7 +334,7 @@ class DedicatedAccountService:
         token = self._ensure_token()
         resp = self._client.get_banks(token)
         banks = resp["responseBody"]
-        return [{"name": bank["bankName"], "code": bank["bankCode"]} for bank in banks]
+        return [{"name": bank["name"], "code": bank["code"]} for bank in banks]
     
     def validate_account(self, account_number: str, bank_code: str) -> Dict:
         """
