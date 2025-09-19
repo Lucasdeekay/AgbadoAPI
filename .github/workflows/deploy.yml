@@ -1,0 +1,105 @@
+# .github/workflows/deploy.yml
+name: Deploy to PythonAnywhere
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    # Uncomment below if you want to test with MySQL in GitHub Actions
+    # services:
+    #   mysql:
+    #     image: mysql:8.0
+    #     env:
+    #       MYSQL_ROOT_PASSWORD: mysql
+    #       MYSQL_DATABASE: test_db
+    #     options: >-
+    #       --health-cmd="mysqladmin ping"
+    #       --health-interval=10s
+    #       --health-timeout=5s
+    #       --health-retries=3
+    #     ports:
+    #       - 3306:3306
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Create test .env file
+      run: |
+        echo "DEBUG=True" >> .env
+        echo "SECRET_KEY=test-secret-key-for-github-actions" >> .env
+        echo "DATABASE_ENGINE=django.db.backends.sqlite3" >> .env
+        echo "DATABASE_NAME=:memory:" >> .env
+    
+    - name: Run tests
+      run: |
+        python manage.py test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Deploy to PythonAnywhere
+      run: |
+        # Pull latest code on PythonAnywhere
+        curl -X POST \
+          -H "Authorization: Token ${{ secrets.PYTHONANYWHERE_API_TOKEN }}" \
+          -d "command=cd /home/${{ secrets.PYTHONANYWHERE_USERNAME }}/${{ secrets.PROJECT_NAME }} && git pull origin main" \
+          https://www.pythonanywhere.com/api/v0/user/${{ secrets.PYTHONANYWHERE_USERNAME }}/consoles/
+        
+        # Create/update .env file on PythonAnywhere
+        curl -X POST \
+          -H "Authorization: Token ${{ secrets.PYTHONANYWHERE_API_TOKEN }}" \
+          -d "command=cd /home/${{ secrets.PYTHONANYWHERE_USERNAME }}/${{ secrets.PROJECT_NAME }} && cat > .env << 'EOF'
+            DEBUG=${{ secrets.DEBUG }}
+            SECRET_KEY=${{ secrets.SECRET_KEY }}
+            DATABASE_NAME=${{ secrets.DATABASE_NAME }}
+            DATABASE_USER=${{ secrets.DATABASE_USER }}
+            DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
+            DATABASE_HOST=${{ secrets.DATABASE_HOST }}
+            DATABASE_PORT=${{ secrets.DATABASE_PORT }}
+            ALLOWED_HOSTS=${{ secrets.ALLOWED_HOSTS }}
+            EOF" \
+            https://www.pythonanywhere.com/api/v0/user/${{ secrets.PYTHONANYWHERE_USERNAME }}/consoles/
+        
+        # Install/update dependencies
+        curl -X POST \
+          -H "Authorization: Token ${{ secrets.PYTHONANYWHERE_API_TOKEN }}" \
+          -d "command=cd /home/${{ secrets.PYTHONANYWHERE_USERNAME }}/${{ secrets.PROJECT_NAME }} && pip3.9 install --user -r requirements.txt" \
+          https://www.pythonanywhere.com/api/v0/user/${{ secrets.PYTHONANYWHERE_USERNAME }}/consoles/
+        
+        # Run migrations
+        curl -X POST \
+          -H "Authorization: Token ${{ secrets.PYTHONANYWHERE_API_TOKEN }}" \
+          -d "command=cd /home/${{ secrets.PYTHONANYWHERE_USERNAME }}/${{ secrets.PROJECT_NAME }} && python3.9 manage.py migrate" \
+          https://www.pythonanywhere.com/api/v0/user/${{ secrets.PYTHONANYWHERE_USERNAME }}/consoles/
+        
+        # Collect static files
+        curl -X POST \
+          -H "Authorization: Token ${{ secrets.PYTHONANYWHERE_API_TOKEN }}" \
+          -d "command=cd /home/${{ secrets.PYTHONANYWHERE_USERNAME }}/${{ secrets.PROJECT_NAME }} && python3.9 manage.py collectstatic --noinput" \
+          https://www.pythonanywhere.com/api/v0/user/${{ secrets.PYTHONANYWHERE_USERNAME }}/consoles/
+        
+        # Restart web app
+        curl -X POST \
+          -H "Authorization: Token ${{ secrets.PYTHONANYWHERE_API_TOKEN }}" \
+          https://www.pythonanywhere.com/api/v0/user/${{ secrets.PYTHONANYWHERE_USERNAME }}/webapps/${{ secrets.DOMAIN_NAME }}/reload/
