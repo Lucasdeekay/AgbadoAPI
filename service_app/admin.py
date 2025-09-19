@@ -234,7 +234,7 @@ class ServiceRequestAdmin(admin.ModelAdmin):
     list_display = (
         'get_title_display', 'get_user_email', 'get_category_display',
         'get_price_display', 'get_status_display', 'get_bids_count',
-        'created_at'
+        'latitude', 'longitude', 'created_at'
     )
     list_filter = (
         'status', 'category', 'created_at', 'user__state'
@@ -248,6 +248,9 @@ class ServiceRequestAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Basic Information', {
             'fields': ('user', 'title', 'description', 'category')
+        }),
+        ('Location', {
+            'fields': ('address', 'latitude', 'longitude'),
         }),
         ('Pricing', {
             'fields': ('price',)
@@ -363,7 +366,7 @@ class ServiceRequestBidAdmin(admin.ModelAdmin):
     """
     list_display = (
         'get_request_title', 'get_provider_name', 'get_amount_display',
-        'get_status_display', 'created_at'
+        'get_status_display', 'get_distance_display', 'created_at'
     )
     list_filter = (
         'status', 'created_at', 'provider__business_category'
@@ -379,6 +382,9 @@ class ServiceRequestBidAdmin(admin.ModelAdmin):
         ('Basic Information', {
             'fields': ('service_request', 'provider', 'amount', 'proposal')
         }),
+        ('Location', {
+            'fields': ('address', 'latitude', 'longitude'),
+        }),
         ('Status', {
             'fields': ('status',)
         }),
@@ -388,6 +394,20 @@ class ServiceRequestBidAdmin(admin.ModelAdmin):
         }),
     )
     actions = ['accept_bids', 'reject_bids', 'withdraw_bids']
+
+    def get_distance_display(self, obj):
+        """Show distance between bid and request."""
+        distance = obj.calculate_distance_km()
+        if distance is not None:
+            return format_html(
+                '<span style="color: #007bff; font-weight: bold;">{} km</span>',
+                distance
+            )
+        return format_html(
+            '<span style="color: #6c757d;">N/A</span>'
+        )
+    get_distance_display.short_description = "Distance"
+
 
     def get_request_title(self, obj):
         """Get service request title."""
@@ -462,21 +482,21 @@ class ServiceRequestBidAdmin(admin.ModelAdmin):
 class BookingAdmin(admin.ModelAdmin):
     """
     Admin configuration for Booking model.
-    
+
     Provides comprehensive management interface for bookings including
     filtering, searching, and bulk actions.
     """
     list_display = (
-        'get_service_name', 'get_user_email', 'get_provider_name',
+        'get_service_request_title', 'get_user_email', 'get_provider_name',
         'get_amount_display', 'get_status_display', 'get_rating_display',
-        'booking_date', 'created_at'
+        'created_at'
     )
     list_filter = (
-        'status', 'booking_date', 'created_at', 'user__state',
+        'status', 'created_at', 'user__state',
         'provider__business_category'
     )
     search_fields = (
-        'service__name', 'user__email', 'provider__company_name',
+        'bid__service_request__title', 'user__email', 'provider__company_name',
         'notes', 'feedback'
     )
     readonly_fields = ('created_at', 'updated_at')
@@ -484,7 +504,7 @@ class BookingAdmin(admin.ModelAdmin):
     list_per_page = 25
     fieldsets = (
         ('Basic Information', {
-            'fields': ('user', 'service', 'provider', 'booking_date')
+            'fields': ('user', 'bid', 'provider', 'booking_date')
         }),
         ('Pricing', {
             'fields': ('amount',)
@@ -499,11 +519,12 @@ class BookingAdmin(admin.ModelAdmin):
     )
     actions = ['confirm_bookings', 'mark_as_completed', 'cancel_bookings']
 
-    def get_service_name(self, obj):
-        """Get service name."""
-        return obj.service.name if obj.service else 'N/A'
-    get_service_name.short_description = 'Service'
-    get_service_name.admin_order_field = 'service__name'
+    # === Custom display methods ===
+    def get_service_request_title(self, obj):
+        """Get service request title from the related bid."""
+        return obj.bid.service_request.title if obj.bid and obj.bid.service_request else 'N/A'
+    get_service_request_title.short_description = 'Service Request'
+    get_service_request_title.admin_order_field = 'bid__service_request__title'
 
     def get_user_email(self, obj):
         """Get user email."""
@@ -545,46 +566,30 @@ class BookingAdmin(admin.ModelAdmin):
         """Get formatted rating display."""
         if obj.rating:
             stars = '★' * obj.rating + '☆' * (5 - obj.rating)
-            return format_html(
-                '<span style="color: #ffc107;">{}</span>',
-                stars
-            )
-        return format_html(
-            '<span style="color: #6c757d;">No rating</span>'
-        )
+            return format_html('<span style="color: #ffc107;">{}</span>', stars)
+        return format_html('<span style="color: #6c757d;">No rating</span>')
     get_rating_display.short_description = 'Rating'
 
+    # === Actions ===
     def confirm_bookings(self, request, queryset):
-        """Confirm selected bookings."""
         updated = queryset.update(status='confirmed')
-        self.message_user(
-            request, 
-            f'Successfully confirmed {updated} booking(s).'
-        )
+        self.message_user(request, f'Successfully confirmed {updated} booking(s).')
     confirm_bookings.short_description = "Confirm selected bookings"
 
     def mark_as_completed(self, request, queryset):
-        """Mark selected bookings as completed."""
         updated = queryset.update(status='completed')
-        self.message_user(
-            request, 
-            f'Successfully marked {updated} booking(s) as completed.'
-        )
+        self.message_user(request, f'Successfully marked {updated} booking(s) as completed.')
     mark_as_completed.short_description = "Mark selected bookings as completed"
 
     def cancel_bookings(self, request, queryset):
-        """Cancel selected bookings."""
         updated = queryset.update(status='cancelled')
-        self.message_user(
-            request, 
-            f'Successfully cancelled {updated} booking(s).'
-        )
+        self.message_user(request, f'Successfully cancelled {updated} booking(s).')
     cancel_bookings.short_description = "Cancel selected bookings"
 
+    # === Query optimizations ===
     def get_queryset(self, request):
-        """Optimize queryset with select_related."""
         return super().get_queryset(request).select_related(
-            'user', 'service', 'provider'
+            'user', 'provider', 'bid__service_request'
         )
 
     def has_add_permission(self, request):
@@ -594,4 +599,3 @@ class BookingAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         """Disable booking deletion."""
         return False
-

@@ -468,34 +468,23 @@ class EditSubServiceView(APIView):
 class ServiceProviderBookingsView(APIView):
     """
     Get all bookings for a service provider.
-    
-    Retrieves all bookings associated with the service provider.
     """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    
-    def get(self, request, *args, **kwargs):
-        service_provider = get_user_from_token(request)  # Assuming the authenticated user is a service provider
-        bookings = Booking.objects.filter(service_provider=service_provider)
-        serializer = BookingSerializer(bookings, many=True)
-        return Response({'bookings': serializer.data})
-    
 
-        """
-        Get all bookings for a service provider.
-        """
+    def get(self, request, *args, **kwargs):
         try:
-            service_provider = get_user_from_token(request)
-            bookings = Booking.objects.filter(service_provider=service_provider)
+            provider = get_user_from_token(request)
+            bookings = Booking.objects.filter(provider=provider)
             serializer = BookingSerializer(bookings, many=True)
-            
-            logger.info(f"Retrieved {len(bookings)} bookings for service provider: {service_provider.email}")
+
+            logger.info(f"Retrieved {len(bookings)} bookings for provider: {provider.email}")
             return Response({'bookings': serializer.data})
-            
+
         except Exception as e:
-            logger.error(f"Error retrieving bookings: {str(e)}")
+            logger.error(f"Error retrieving provider bookings: {str(e)}")
             return Response(
-                {"message": f"An error occurred: {str(e)}"}, 
+                {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -503,227 +492,305 @@ class ServiceProviderBookingsView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class ServiceProviderBidsView(APIView):
     """
-    Get service requests and bids for a service provider.
-    
-    Retrieves service requests in the provider's category and their bids.
+    Get service requests in provider's category and their bids.
     """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request, *args, **kwargs):
-        """
-        Get service requests and bids for a service provider.
-        """
         try:
             user = get_user_from_token(request)
 
             try:
-                service_provider = ServiceProvider.objects.get(user=user)
+                provider = ServiceProvider.objects.get(user=user)
             except ServiceProvider.DoesNotExist:
                 return Response(
-                    {"message": "User does not have a business profile, kindly create one."}, 
+                    {"message": "User does not have a business profile, kindly create one."},
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-            # Get service requests in the same category as the service provider
-            service_requests = ServiceRequest.objects.filter(category=service_provider.business_category).exclude(user=user)
-            request_serializer = ServiceRequestSerializer(service_requests, many=True, context={'request': request})
+            service_requests = ServiceRequest.objects.filter(
+                category=provider.business_category
+            ).exclude(user=user)
 
-            # Get bids made by this service provider
-            bids = ServiceRequestBid.objects.filter(service_provider=user)
-            bid_serializer = ServiceRequestBidSerializer(bids, many=True, context={'request': request})
+            request_serializer = ServiceRequestSerializer(
+                service_requests, many=True, context={'request': request}
+            )
 
-            logger.info(f"Retrieved {len(service_requests)} service requests and {len(bids)} bids for provider: {service_provider.company_name}")
+            bids = ServiceRequestBid.objects.filter(provider=user)
+            bid_serializer = ServiceRequestBidSerializer(
+                bids, many=True, context={'request': request}
+            )
+
+            logger.info(f"Retrieved {len(service_requests)} requests & {len(bids)} bids for provider: {provider.company_name}")
             return Response({
                 'requests': request_serializer.data,
                 'bids': bid_serializer.data,
             })
-            
+
         except Exception as e:
-            logger.error(f"Error retrieving service requests and bids: {str(e)}")
+            logger.error(f"Error retrieving provider requests/bids: {str(e)}")
             return Response(
-                {"message": f"An error occurred: {str(e)}"}, 
+                {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
-
 class SubmitBidView(APIView):
     """
-    Submit a bid for a service request.
-    
-    Allows service providers to submit or update bids for service requests.
+    Submit or update a bid for a service request.
     """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request, service_request_id, *args, **kwargs):
-        """
-        Submit a bid for a service request.
-        
-        URL parameter: service_request_id
-        Required fields: price
-        """
         try:
-            service_provider = get_user_from_token(request)
+            provider = get_user_from_token(request)
+
             try:
                 service_request = ServiceRequest.objects.get(id=int(service_request_id))
             except ServiceRequest.DoesNotExist:
                 raise NotFound("Service request not found")
 
-            price = request.data.get('price')
+            amount = request.data.get('amount')
+            proposal = request.data.get('proposal')
 
-            if price is None:
-                return Response(
-                    {"message": "Price is required"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            if not amount:
+                return Response({"message": "Amount is required"}, status=status.HTTP_400_BAD_REQUEST)
 
             try:
-                price = float(price)
+                amount = float(amount)
             except ValueError:
-                return Response(
-                    {"message": "Invalid price format"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"message": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Check if a bid already exists
             existing_bid = ServiceRequestBid.objects.filter(
-                service_request=service_request, 
-                service_provider=service_provider
+                service_request=service_request,
+                provider=provider
             ).first()
 
             if existing_bid:
-                # Update existing bid
-                existing_bid.price = price
+                existing_bid.amount = amount
+                existing_bid.proposal = proposal or existing_bid.proposal
                 existing_bid.save()
 
                 Notification.objects.create(
-                    user=service_provider,
+                    user=service_request.user,
                     title="Bid Updated",
-                    message=f"You have updated your bid for service request: {service_request.title}"
+                    message=f"{provider.email} updated their bid on your request: {service_request.title}"
                 )
 
-                logger.info(f"Bid updated for service request: {service_request.title}")
-                return Response(
-                    {"message": "Bid updated successfully"}, 
-                    status=status.HTTP_200_OK
-                )
+                logger.info(f"Bid updated for request {service_request.title}")
+                return Response({"message": "Bid updated successfully"}, status=status.HTTP_200_OK)
+
             else:
-                # Create new bid
                 ServiceRequestBid.objects.create(
                     service_request=service_request,
-                    service_provider=service_provider,
-                    price=price
+                    provider=provider,
+                    amount=amount,
+                    proposal=proposal
                 )
 
                 Notification.objects.create(
-                    user=service_provider,
-                    title="Bid Submitted",
-                    message=f"You have submitted a bid for service request: {service_request.title}"
+                    user=service_request.user,
+                    title="New Bid Submitted",
+                    message=f"{provider.email} submitted a bid on your request: {service_request.title}"
                 )
 
-                logger.info(f"Bid submitted for service request: {service_request.title}")
-                return Response(
-                    {"message": "Bid submitted successfully"}, 
-                    status=status.HTTP_201_CREATED
-                )
+                logger.info(f"Bid submitted for request {service_request.title}")
+                return Response({"message": "Bid submitted successfully"}, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             logger.error(f"Error submitting bid: {str(e)}")
-            return Response(
-                {"message": f"An error occurred: {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
+            return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CancelBookingView(APIView):
     """
-    Cancel a booking.
-    
-    Allows service providers to cancel bookings.
+    Cancel a booking by the provider.
     """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request, booking_id, *args, **kwargs):
-        """
-        Cancel a booking.
-        
-        URL parameter: booking_id
-        """
         try:
-            service_provider = get_user_from_token(request)
+            provider = get_user_from_token(request)
+
             try:
-                booking = Booking.objects.get(id=int(booking_id), service_provider=service_provider)
+                booking = Booking.objects.get(id=int(booking_id), provider=provider)
             except Booking.DoesNotExist:
                 raise NotFound("Booking not found")
-            
-            booking.provider_status = 'Cancelled'
+
+            booking.status = 'Cancelled'
             booking.save()
 
             Notification.objects.create(
-                user=service_provider,
+                user=booking.user,
                 title="Booking Cancelled",
-                message=f"You have cancelled booking: {booking.service_request.title}"
+                message=f"Your booking for {booking.bid.service_request.title} was cancelled."
             )
-            
-            logger.info(f"Booking cancelled: {booking.service_request.title}")
-            return Response(
-                {"message": "Booking cancelled successfully"}, 
-                status=status.HTTP_200_OK
-            )
+
+            logger.info(f"Booking {booking.id} cancelled by provider {provider.email}")
+            return Response({"message": "Booking cancelled successfully"}, status=status.HTTP_200_OK)
 
         except Exception as e:
             logger.error(f"Error cancelling booking: {str(e)}")
-            return Response(
-                {"message": f"An error occurred: {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
+            return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CompleteBookingView(APIView):
     """
-    Complete a booking.
-    
-    Allows service providers to mark bookings as completed.
+    Mark a booking as completed by the provider.
     """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request, booking_id, *args, **kwargs):
-        """
-        Complete a booking.
-        
-        URL parameter: booking_id
-        """
         try:
-            service_provider = get_user_from_token(request)
+            provider = get_user_from_token(request)
+
             try:
-                booking = Booking.objects.get(id=int(booking_id), service_provider=service_provider)
+                booking = Booking.objects.get(id=int(booking_id), provider=provider)
             except Booking.DoesNotExist:
                 raise NotFound("Booking not found")
-            
-            booking.provider_status = 'Completed'
+
+            booking.status = 'Completed'
             booking.save()
 
             Notification.objects.create(
-                user=service_provider,
+                user=booking.user,
                 title="Booking Completed",
-                message=f"You have completed booking: {booking.service_request.title}"
+                message=f"Your booking for {booking.bid.service_request.title} has been marked as completed."
             )
-            
-            logger.info(f"Booking completed: {booking.service_request.title}")
+
+            logger.info(f"Booking {booking.id} marked completed by provider {provider.email}")
+            return Response({"message": "Booking marked as completed"}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error completing booking: {str(e)}")
+            return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class UserBookingsView(APIView):
+    """
+    Get all bookings for a user (client).
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            user = get_user_from_token(request)
+            bookings = Booking.objects.filter(user=user)
+            serializer = BookingSerializer(bookings, many=True)
+
+            logger.info(f"Retrieved {len(bookings)} bookings for user: {user.email}")
+            return Response({'bookings': serializer.data})
+
+        except Exception as e:
+            logger.error(f"Error retrieving user bookings: {str(e)}")
             return Response(
-                {"message": "Booking completed successfully"}, 
+                {"message": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class AcceptBidView(APIView):
+    """
+    Accept a bid -> Creates a booking & rejects all other bids for the same request.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, bid_id, *args, **kwargs):
+        try:
+            user = get_user_from_token(request)
+
+            try:
+                bid = ServiceRequestBid.objects.get(id=bid_id, service_request__user=user)
+            except ServiceRequestBid.DoesNotExist:
+                raise NotFound("Bid not found or not yours to accept")
+
+            # Reject all other bids for this service request
+            other_bids = ServiceRequestBid.objects.filter(
+                service_request=bid.service_request
+            ).exclude(id=bid.id)
+
+            for other in other_bids:
+                other.status = "Rejected"
+                other.save()
+
+                Notification.objects.create(
+                    user=other.provider,
+                    title="Bid Rejected",
+                    message=f"Your bid for {other.service_request.title} was rejected."
+                )
+
+            # Accept the chosen bid
+            bid.status = "Accepted"
+            bid.save()
+
+            # Create booking
+            booking = Booking.objects.create(
+                user=user,
+                provider=bid.provider,
+                bid=bid,
+                amount=bid.amount,
+                status="Pending"
+            )
+
+            Notification.objects.create(
+                user=bid.provider,
+                title="Bid Accepted",
+                message=f"Your bid for {bid.service_request.title} was accepted!"
+            )
+
+            logger.info(f"Booking {booking.id} created by {user.email} from bid {bid.id}")
+            return Response(
+                {"message": "Bid accepted, booking created, and other bids rejected"},
+                status=status.HTTP_201_CREATED
+            )
+
+        except Exception as e:
+            logger.error(f"Error accepting bid: {str(e)}")
+            return Response(
+                {"message": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class DeclineBidView(APIView):
+    """
+    Decline a specific bid without accepting any other.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, bid_id, *args, **kwargs):
+        try:
+            user = get_user_from_token(request)
+
+            try:
+                bid = ServiceRequestBid.objects.get(id=bid_id, service_request__user=user)
+            except ServiceRequestBid.DoesNotExist:
+                raise NotFound("Bid not found or not yours to decline")
+
+            bid.status = "Rejected"
+            bid.save()
+
+            Notification.objects.create(
+                user=bid.provider,
+                title="Bid Rejected",
+                message=f"Your bid for {bid.service_request.title} was declined."
+            )
+
+            logger.info(f"Bid {bid.id} declined by user {user.email}")
+            return Response(
+                {"message": "Bid declined successfully"},
                 status=status.HTTP_200_OK
             )
 
         except Exception as e:
-            logger.error(f"Error completing booking: {str(e)}")
+            logger.error(f"Error declining bid: {str(e)}")
             return Response(
-                {"message": f"An error occurred: {str(e)}"}, 
+                {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

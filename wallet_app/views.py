@@ -60,6 +60,33 @@ logger = logging.getLogger(__name__)
 
 MONNIFY_SECRET_KEY = os.environ.get("MONNIFY_SECRET_KEY")
 
+def _verify_monnify_signature(request_body: bytes, signature_header: str) -> bool:
+    """
+    Monnify sends:
+        monnify-signature: t=<epoch-ms>,v1=<hex_hmac_sha512>
+    """
+    if not signature_header:
+        return False
+
+    try:
+        ts, v1 = signature_header.split(",")
+        ts = ts.split("=")[1]
+        v1 = v1.split("=")[1]
+    except (IndexError, ValueError):
+        return False
+
+    payload = f"{ts}.{request_body.decode('utf-8')}"
+    digest = hmac.new(
+        MONNIFY_SECRET_KEY.encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha512,
+    ).hexdigest()
+
+    return hmac.compare_digest(digest, v1)
+
+
+
+
 class WalletDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -133,305 +160,142 @@ class WithdrawalRequestView(APIView):
 
 @method_decorator(csrf_exempt, name='dispatch') # Disable CSRF for webhook endpoint
 class MonnifyWebhookView(APIView):
-    authentication_classes = [] # No authentication for webhooks
-    permission_classes = []     # No permissions for webhooks
+    """
+    POST  /webhooks/monnify/
+    No auth – Monnify signs the payload instead.
+    """
+    authentication_classes = []
+    permission_classes = []
 
     def post(self, request, *args, **kwargs):
-        # 1. Verify Webhook Signature
-        paystack_signature = request.headers.get('x-paystack-signature')
-        if not paystack_signature:
-            logger.warning("No X-Paystack-Signature header in webhook request.")
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST, content="No X-Paystack-Signature header.")
+        sig = request.headers.get("monnify-signature")
+        if not _verify_monnify_signature(request.body, sig):
+            logger.warning("Monnify webhook signature invalid.")
+            return HttpResponse(status=status.HTTP_403_FORBIDDEN, content="Bad signature")
 
-        # Get raw request body (important for signature verification)
-        raw_payload = request.body.decode('utf-8')
-
-        # Hash the payload with your secret key
-        digest = hmac.new(
-            MONNIFY_SECRET_KEY.encode('utf-8'),
-            raw_payload.encode('utf-8'),
-            hashlib.sha512
-        ).hexdigest()
-
-        if digest != paystack_signature:
-            logger.warning("Webhook signature mismatch. Potential tampering detected.")
-            return HttpResponse(status=status.HTTP_403_FORBIDDEN, content="Invalid webhook signature.")
-
-        # 2. Parse the Event Data
         try:
-            event = json.loads(raw_payload)
+            payload = json.loads(request.body)
         except json.JSONDecodeError:
-            logger.error("Invalid JSON payload in webhook request.")
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST, content="Invalid JSON payload.")
+            logger.error("Invalid JSON in Monnify webhook.")
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST, content="Bad JSON")
 
-        event_type = event.get('event')
-        event_data = event.get('data')
+        event_type = payload.get("eventType")
+        data = payload.get("eventData")
 
-        if not event_type or not event_data:
-            logger.warning("Invalid event data structure in webhook request.")
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST, content="Invalid event data structure.")
+        if not event_type or not data:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST, content="Bad payload")
 
-        # Paystack expects a 200 OK response quickly, even if processing takes time.
-        # For complex logic, you'd send 200 OK immediately and offload processing to a task queue.
-        # For this example, we'll process synchronously.
+        # Monnify expects 200 immediately
         try:
-            if event_type == 'charge.success':
-                self._handle_charge_success(event_data)
-            elif event_type == 'transfer.success':
-                self._handle_transfer_success(event_data)
-            elif event_type == 'transfer.failed':
-                self._handle_transfer_failed(event_data)
-            elif event_type == 'transfer.reversed':
-                self._handle_transfer_reversed(event_data)
-            # Add other event types if necessary (e.g., invoice.create, subscription.update)
+            if event_type == "SUCCESSFUL_TRANSACTION":
+                self._handle_successful_transaction(data)
+            elif event_type == "FAILED_TRANSACTION":
+                self._handle_failed_transaction(data)
+            elif event_type == "REVERSED_TRANSACTION":
+                self._handle_reversed_transaction(data)
             else:
-                logger.info(f"Unhandled Paystack event type: {event_type}")
+                logger.info(f"Unhandled Monnify event: {event_type}")
 
-            return HttpResponse(status=status.HTTP_200_OK) # Acknowledge receipt
-        except Exception as e:
-            # Log the error, but still return 200 to Paystack to prevent retries
-            # For debugging, you might temporarily return 500, but in production, 200 is safer.
-            logger.error(f"Error processing Paystack webhook event {event_type}: {e}")
-            return HttpResponse(status=status.HTTP_200_OK) # Still return 200 to Paystack
+            return HttpResponse(status=status.HTTP_200_OK)
 
+        except Exception as exc:
+            logger.exception("Error processing Monnify webhook: %s", exc)
+            return HttpResponse(status=status.HTTP_200_OK)  # do not retry
 
-    def _handle_charge_success(self, data):
+    # ------------------------------------------------------------------
+    # Event handlers
+    # ------------------------------------------------------------------
+    def _handle_successful_transaction(self, data: dict):
         """
-        Handles successful deposit events (e.g., from Dedicated Virtual Accounts).
+        Deposit (incoming funds) – covers reserved-account and card payments.
         """
-        reference = data.get('reference')
-        amount_kobo = data.get('amount') # Amount in kobo/pesewas
-        status = data.get('status')
-        customer_email = data.get('customer', {}).get('email')
-        paystack_transaction_id = data.get('id')
-        paid_at = data.get('paid_at') # Payment timestamp
-
-        if status != 'success':
-            logger.warning(f"Charge not successful for reference {reference}, status: {status}")
-            return
-
-        amount = Decimal(amount_kobo) / 100 # Convert kobo to your currency unit
+        reference = data["paymentReference"]  # your internal ref
+        amount = Decimal(str(data["amountPaid"]))
+        customer_email = data["customer"]["email"]
+        txn_ref = data["transactionReference"]  # Monnify’s own ref
 
         with db_transaction.atomic():
-            # Check for idempotency: Has this transaction already been processed?
-            if Transaction.objects.filter(reference=reference, status='Completed').exists():
-                logger.info(f"Deposit with reference {reference} already processed. Skipping.")
+            if Transaction.objects.filter(reference=reference, status="Completed").exists():
+                logger.info("Deposit %s already processed.", reference)
                 return
 
             try:
-                # Find user by email (or by customer_code if stored on User model directly)
                 user = User.objects.get(email=customer_email)
                 wallet = Wallet.objects.select_for_update().get(user=user)
 
                 wallet.balance += amount
-                wallet.save(update_fields=['balance'])
+                wallet.save(update_fields=["balance"])
 
-                transaction, created = Transaction.objects.get_or_create(
-                    reference=reference, # Use reference for uniqueness
-                    defaults={
-                        'user': user,
-                        'transaction_type': 'Deposit',
-                        'amount': amount,
-                        'status': 'Completed',
-                        'paystack_transaction_id': paystack_transaction_id,
-                        'created_at': timezone.datetime.fromisoformat(paid_at.replace('Z', '+00:00')) if paid_at else timezone.now(),
-                    }
+                Transaction.objects.create(
+                    user=user,
+                    transaction_type="Deposit",
+                    amount=amount,
+                    status="Completed",
+                    reference=reference,
+                    monnify_transaction_id=txn_ref,
+                    created_at=timezone.now(),
                 )
-                if not created:
-                    # If transaction already existed but wasn't 'Completed' (e.g., failed retry)
-                    transaction.status = 'Completed'
-                    transaction.paystack_transaction_id = paystack_transaction_id
-                    transaction.save(update_fields=['status', 'paystack_transaction_id'])
 
                 Notification.objects.create(
                     user=user,
                     title="Deposit Successful",
-                    message=f"A deposit of {amount} has been successfully added to your wallet. Ref: {reference}"
+                    message=f"Your wallet has been credited with {amount}. Ref: {reference}",
                 )
-                logger.info(f"Successfully processed deposit for {user.email}, amount {amount}, ref {reference}")
+                logger.info("Deposit processed for %s – %s", user.email, reference)
 
             except User.DoesNotExist:
-                logger.error(f"User not found for email: {customer_email}. Cannot process deposit {reference}.")
-                # Handle this: maybe create a user? Log a critical error?
-            except Wallet.DoesNotExist:
-                logger.error(f"Wallet not found for user: {customer_email}. Cannot process deposit {reference}.")
-                # This should ideally not happen if you create wallets with users
-            except Exception as e:
-                logger.error(f"Error handling charge.success for {reference}: {e}")
-                raise # Re-raise to ensure transaction rollback if within atomic block
+                logger.error("User %s not found for deposit %s", customer_email, reference)
 
-    def _handle_transfer_success(self, data):
+    def _handle_failed_transaction(self, data: dict):
         """
-        Handles successful withdrawal (transfer) events.
+        Failed deposit – typically no-op for the wallet, but you can log it.
         """
-        reference = data.get('reference')
-        amount_kobo = data.get('amount')
-        paystack_transfer_id = data.get('id')
+        reference = data["paymentReference"]
+        logger.warning("Monnify reported failed deposit %s", reference)
 
-        amount = Decimal(amount_kobo) / 100
+    def _handle_reversed_transaction(self, data: dict):
+        """
+        Withdrawal was reversed – credit the wallet back.
+        """
+        reference = data["paymentReference"]  # original withdrawal ref
+        amount = Decimal(str(data["amountPaid"]))
+        reason = data.get("message", "Reversed by Monnify")
 
         with db_transaction.atomic():
             try:
-                # Find the corresponding Withdrawal request
-                withdrawal = Withdrawal.objects.select_for_update().get(
-                    paystack_transfer_reference=reference
+                txn = Transaction.objects.select_for_update().get(
+                    reference=reference,
+                    transaction_type="Withdrawal",
                 )
-
-                if withdrawal.status == 'Completed':
-                    logger.info(f"Withdrawal {reference} already marked as completed. Skipping.")
+                if txn.status == "Reversed":
+                    logger.info("Reversal %s already handled.", reference)
                     return
 
-                withdrawal.status = 'Completed'
-                withdrawal.updated_at = timezone.now()
-                withdrawal.save(update_fields=['status', 'updated_at'])
+                wallet = Wallet.objects.select_for_update().get(user=txn.user)
+                wallet.balance += amount
+                wallet.save(update_fields=["balance"])
 
-                # Update the corresponding Transaction
-                transaction = Transaction.objects.get(
-                    user=withdrawal.user,
-                    transaction_type='Withdrawal',
-                    reference=reference # Match by the same reference
-                )
-                transaction.status = 'Completed'
-                transaction.updated_at = timezone.now()
-                transaction.save(update_fields=['status', 'updated_at'])
+                txn.status = "Reversed"
+                txn.save(update_fields=["status"])
 
-                Notification.objects.create(
-                    user=withdrawal.user,
-                    title="Withdrawal Completed",
-                    message=f"Your withdrawal of {amount} has been successfully processed."
-                )
-                logger.info(f"Successfully processed successful transfer for {reference}")
-
-            except Withdrawal.DoesNotExist:
-                logger.warning(f"Withdrawal request with reference {reference} not found. Could not update status.")
-            except Transaction.DoesNotExist:
-                logger.warning(f"Transaction for withdrawal {reference} not found. Data inconsistency.")
-            except Exception as e:
-                logger.error(f"Error handling transfer.success for {reference}: {e}")
-                raise
-
-    def _handle_transfer_failed(self, data):
-        """
-        Handles failed withdrawal (transfer) events. Funds are NOT returned by Paystack.
-        This means the funds were deducted from your Paystack balance but didn't reach the recipient.
-        You might need to manually reconcile or contact Paystack support.
-        From a user's wallet perspective, their balance was already reduced, and it should remain so.
-        """
-        reference = data.get('reference')
-        fail_reason = data.get('transfer_code_reason') or data.get('status') or 'Unknown reason'
-        amount_kobo = data.get('amount')
-        
-        amount = Decimal(amount_kobo) / 100
-
-        with db_transaction.atomic():
-            try:
-                withdrawal = Withdrawal.objects.select_for_update().get(
-                    paystack_transfer_reference=reference
-                )
-
-                if withdrawal.status == 'Failed':
-                    logger.info(f"Withdrawal {reference} already marked as failed. Skipping.")
-                    return
-
-                withdrawal.status = 'Failed'
-                withdrawal.failure_reason = f"Paystack transfer failed: {fail_reason}"
-                withdrawal.updated_at = timezone.now()
-                withdrawal.save(update_fields=['status', 'failure_reason', 'updated_at'])
-
-                transaction = Transaction.objects.get(
-                    user=withdrawal.user,
-                    transaction_type='Withdrawal',
-                    reference=reference
-                )
-                transaction.status = 'Failed'
-                transaction.updated_at = timezone.now()
-                transaction.save(update_fields=['status', 'updated_at'])
-
-                Notification.objects.create(
-                    user=withdrawal.user,
-                    title="Withdrawal Failed",
-                    message=f"Your withdrawal of {amount} failed. Reason: {fail_reason}. Please contact support."
-                )
-                logger.warning(f"Processed failed transfer for {reference}, reason: {fail_reason}")
-
-            except Withdrawal.DoesNotExist:
-                logger.warning(f"Withdrawal request with reference {reference} not found for failed event.")
-            except Transaction.DoesNotExist:
-                logger.warning(f"Transaction for failed withdrawal {reference} not found. Data inconsistency.")
-            except Exception as e:
-                logger.error(f"Error handling transfer.failed for {reference}: {e}")
-                raise
-
-    def _handle_transfer_reversed(self, data):
-        """
-        Handles reversed withdrawal (transfer) events.
-        This means the funds were reversed back to YOUR Paystack balance.
-        Crucially, you MUST credit the user's wallet back.
-        """
-        reference = data.get('reference')
-        amount_kobo = data.get('amount')
-        reverse_reason = data.get('message') or 'Unknown reason'
-
-        amount = Decimal(amount_kobo) / 100
-
-        with db_transaction.atomic():
-            try:
-                withdrawal = Withdrawal.objects.select_for_update().get(
-                    paystack_transfer_reference=reference
-                )
-
-                if withdrawal.status == 'Reversed':
-                    logger.info(f"Withdrawal {reference} already marked as reversed. Skipping.")
-                    return
-
-                # Update Withdrawal status
-                withdrawal.status = 'Reversed'
-                withdrawal.failure_reason = f"Paystack transfer reversed: {reverse_reason}"
-                withdrawal.updated_at = timezone.now()
-                withdrawal.save(update_fields=['status', 'failure_reason', 'updated_at'])
-
-                # Credit user's wallet back
-                user_wallet = Wallet.objects.select_for_update().get(user=withdrawal.user)
-                user_wallet.balance += amount
-                user_wallet.save(update_fields=['balance'])
-                logger.info(f"Credited wallet of {user_wallet.user.email} with {amount} due to reversed transfer {reference}.")
-
-                # Update the corresponding Transaction
-                transaction = Transaction.objects.get(
-                    user=withdrawal.user,
-                    transaction_type='Withdrawal',
-                    reference=reference
-                )
-                transaction.status = 'Reversed'
-                transaction.updated_at = timezone.now()
-                transaction.save(update_fields=['status', 'updated_at'])
-
-                # Create a new deposit transaction to clearly show funds return
+                # Optionally create a new deposit record
                 Transaction.objects.create(
-                    user=withdrawal.user,
-                    transaction_type='Deposit',
+                    user=txn.user,
+                    transaction_type="Deposit",
                     amount=amount,
-                    status='Completed',
-                    reference=f"REVERSED-DEPOSIT-{reference}", # New unique ref for the return
-                    # Link to original withdrawal if needed
+                    status="Completed",
+                    reference=f"REVERSED-{reference}",
                 )
 
                 Notification.objects.create(
-                    user=withdrawal.user,
-                    title="Withdrawal Reversed & Funds Returned",
-                    message=f"Your withdrawal of {amount} was reversed. The funds have been returned to your wallet. Reason: {reverse_reason}"
+                    user=txn.user,
+                    title="Withdrawal Reversed",
+                    message=f"Withdrawal {reference} was reversed and {amount} returned to your wallet. Reason: {reason}",
                 )
-                logger.info(f"Processed reversed transfer for {reference}, reason: {reverse_reason}. Funds returned to wallet.")
+                logger.info("Reversal processed for %s – %s", txn.user.email, reference)
 
-            except Withdrawal.DoesNotExist:
-                logger.warning(f"Withdrawal request with reference {reference} not found for reversed event.")
             except Transaction.DoesNotExist:
-                logger.warning(f"Transaction for reversed withdrawal {reference} not found. Data inconsistency.")
-            except Wallet.DoesNotExist:
-                logger.critical(f"Wallet for user {withdrawal.user.email} not found for reversed transfer {reference}. Critical error.")
-            except Exception as e:
-                logger.error(f"Error handling transfer.reversed for {reference}: {e}")
-                raise
+                logger.error("No matching withdrawal %s for reversal.", reference)
 
 
 class FetchBanksView(APIView):

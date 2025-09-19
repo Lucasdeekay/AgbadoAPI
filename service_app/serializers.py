@@ -245,7 +245,10 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
             'title': {'required': True},
             'description': {'required': True},
             'category': {'required': True},
-            'price': {'required': True}
+            'price': {'required': True},
+            'latitude': {'required': True},
+            'longitude': {'required': True},
+            'address': {'required': True}
         }
 
     def get_image(self, obj):
@@ -359,6 +362,7 @@ class ServiceRequestBidSerializer(serializers.ModelSerializer):
     """
     service_provider = serializers.SerializerMethodField()
     service_request = serializers.SerializerMethodField()
+    distance_km = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceRequestBid
@@ -368,8 +372,18 @@ class ServiceRequestBidSerializer(serializers.ModelSerializer):
             'service_provider': {'required': True},
             'service_request': {'required': True},
             'bid_amount': {'required': True},
-            'proposal': {'required': True}
+            'proposal': {'required': True},
+            'latitude': {'required': True},
+            'longitude': {'required': True},
+            'address': {'required': True}
         }
+
+    def get_distance_km(self, obj):
+        """
+        Return distance in kilometers between bid and request.
+        """
+        distance = obj.calculate_distance_km()
+        return distance if distance is not None else None
 
     def get_service_provider(self, obj):
         """
@@ -443,12 +457,13 @@ class ServiceRequestBidSerializer(serializers.ModelSerializer):
 class BookingSerializer(serializers.ModelSerializer):
     """
     Serializer for Booking model.
-    
+
     Handles booking data serialization and deserialization including
-    booking information, user details, and service provider details.
+    booking information, user details, provider details, and bid details.
     """
     user = serializers.SerializerMethodField()
-    service_provider = serializers.SerializerMethodField()
+    provider = serializers.SerializerMethodField()
+    bid = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -456,47 +471,53 @@ class BookingSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_at', 'updated_at')
         extra_kwargs = {
             'user': {'required': True},
-            'service_provider': {'required': True},
-            'service_request': {'required': True},
-            'booking_date': {'required': True},
-            'booking_time': {'required': True}
+            'provider': {'required': True},
+            'bid': {'required': True},
+            'amount': {'required': True},
         }
 
     def get_user(self, obj):
-        """
-        Get user information for booking.
-        
-        Returns user data including ID, email, name, and profile picture.
-        """
+        """Get user information for booking."""
+        if not obj.user:
+            return None
         return {
             "id": obj.user.id,
             "email": obj.user.email,
             "first_name": obj.user.first_name,
             "last_name": obj.user.last_name,
-            "profile_picture": obj.user.profile_picture,
+            "profile_picture": getattr(obj.user, "profile_picture", None),
         }
 
-    def get_service_provider(self, obj):
-        """
-        Get service provider information for booking.
-        
-        Returns service provider data including ID, email, name, and profile picture.
-        """
+    def get_provider(self, obj):
+        """Get provider information for booking."""
+        if not obj.provider:
+            return None
         return {
-            "id": obj.service_provider.id,
-            "email": obj.service_provider.email,
-            "first_name": obj.service_provider.first_name,
-            "last_name": obj.service_provider.last_name,
-            "profile_picture": obj.service_provider.profile_picture,
+            "id": obj.provider.id,
+            "email": obj.provider.email,
+            "first_name": obj.provider.first_name,
+            "last_name": obj.provider.last_name,
+            "profile_picture": getattr(obj.provider, "profile_picture", None),
+            "company_name": getattr(obj.provider, "company_name", None),
         }
 
-    def validate_booking_date(self, value):
-        """
-        Validate booking date.
-        
-        Ensures booking date is not in the past.
-        """
-        from django.utils import timezone
-        if value < timezone.now().date():
-            raise serializers.ValidationError("Booking date cannot be in the past.")
-        return value
+    def get_bid(self, obj):
+        """Get bid details (amount, proposal, service request)."""
+        if not obj.bid:
+            return None
+        bid = obj.bid
+        return {
+            "id": bid.id,
+            "amount": bid.amount,
+            "proposal": bid.proposal,
+            "status": bid.status,
+            "created_at": bid.created_at,
+            "service_request": {
+                "id": bid.service_request.id,
+                "title": bid.service_request.title,
+                "description": bid.service_request.description,
+                "category": bid.service_request.category,
+                "price": bid.service_request.price,
+                "status": bid.service_request.status,
+            } if bid.service_request else None
+        }
