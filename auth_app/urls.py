@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from .views import CompleteWebAuthnAuthenticationView, CompleteWebAuthnRegistrationView, DeleteAccountView, DeleteWebAuthnCredentialView, ListWebAuthnCredentialsView, RegisterServiceProviderView, LoginView, LogoutView, ForgotPasswordView, RegisterUserView, ResetPasswordView, SendOTPView, StartWebAuthnAuthenticationView, StartWebAuthnRegistrationView, UpdateIsBusyView, VerifyOTPView, \
-    GoogleAppleAuthView, PinRegistrationView, PinUpdateView, PinAuthView
+    GoogleAppleAuthView, PinRegistrationView, PinUpdateView, PinAuthView, DeleteAccountView
 from .viewsets import UserViewSet, KYCViewSet, OTPViewSet, ReferralViewSet
 
 router = DefaultRouter()
@@ -22,6 +22,7 @@ urlpatterns = [
     path('delete-account/', DeleteAccountView.as_view(), name='delete-account'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('update-status/', UpdateIsBusyView.as_view(), name='update-status'),
+    path('delete-account/', DeleteAccountView.as_view(), name='delete-account'),
     
     # PIN Authentication endpoints
     path('pin/register/', PinRegistrationView.as_view(), name='pin-register'),

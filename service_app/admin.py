@@ -11,8 +11,58 @@ from django.db.models import Count, Avg
 from django.utils import timezone
 from datetime import timedelta
 
-from .models import Service, SubService, ServiceRequest, ServiceRequestBid, Booking
+from .models import Service, SubService, ServiceRequest, ServiceRequestBid, Booking,Category
 
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    """
+    Admin configuration for Category model.
+
+    Provides management interface for service categories including
+    filtering, searching, and bulk actions.
+    """
+    list_display = ('name', 'is_active_display', 'created_at')
+    list_filter = ('is_active', 'created_at')
+    search_fields = ('name',)
+    ordering = ('name',)
+    readonly_fields = ('created_at', 'updated_at')
+    list_per_page = 25
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name',)
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    actions = ['activate_categories', 'deactivate_categories']
+
+    def is_active_display(self, obj):
+        """Get formatted active status."""
+        if obj.is_active:
+            return format_html(
+                '<span style="color: #28a745; font-weight: bold;">✓ Active</span>'
+            )
+        return format_html(
+            '<span style="color: #dc3545; font-weight: bold;">✗ Inactive</span>'
+        )
+    is_active_display.short_description = 'Status'
+
+    def activate_categories(self, request, queryset):
+        """Activate selected categories."""
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f"Successfully activated {updated} category(s).")
+    activate_categories.short_description = "Activate selected categories"
+
+    def deactivate_categories(self, request, queryset):
+        """Deactivate selected categories."""
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f"Successfully deactivated {updated} category(s).")
+    deactivate_categories.short_description = "Deactivate selected categories"
 
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):

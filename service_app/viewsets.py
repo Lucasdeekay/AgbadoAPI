@@ -8,12 +8,13 @@ including services, subservices, service requests, bids, and bookings with prope
 from rest_framework import viewsets, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
-from .models import Service, SubService, ServiceRequest, ServiceRequestBid, Booking
-from .serializers import ServiceSerializer, SubServiceSerializer, ServiceRequestSerializer, ServiceRequestBidSerializer, BookingSerializer
+from .models import Category, Service, SubService, ServiceRequest, ServiceRequestBid, Booking
+from .serializers import CategorySerializer, ServiceSerializer, SubServiceSerializer, ServiceRequestSerializer, ServiceRequestBidSerializer, BookingSerializer
 
 import logging
 
@@ -28,6 +29,39 @@ class CustomPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100
 
+class CategoryViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Category model.
+
+    Provides CRUD operations for service categories with filtering by
+    name and active status.
+    """
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    pagination_class = CustomPagination
+    filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter)
+    filterset_fields = ['name', 'is_active']
+    search_fields = ['name']
+    ordering_fields = ['created_at', 'name']
+    ordering = ['name']
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        """Log category creation."""
+        category = serializer.save()
+        logger.info(f"Category created: {category.name}")
+
+    def perform_update(self, serializer):
+        """Log category update."""
+        category = serializer.save()
+        logger.info(f"Category updated: {category.name}")
+
+    def perform_destroy(self, instance):
+        """Log category deletion."""
+        category_name = instance.name
+        instance.delete()
+        logger.info(f"Category deleted: {category_name}")
+        
 
 class ServiceViewSet(viewsets.ModelViewSet):
     """
@@ -40,7 +74,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter)
     filterset_fields = ['name', 'is_active', 'category', 'provider']
-    search_fields = ['name', 'description', 'category']
+    search_fields = ['name', 'description', 'category__name']
     ordering_fields = ['created_at', 'name', 'min_price', 'max_price']
     ordering = ['-created_at']
     permission_classes = [IsAuthenticated]
@@ -105,7 +139,7 @@ class ServiceRequestViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter)
     filterset_fields = ['category', 'status', 'user']
-    search_fields = ['title', 'description', 'category']
+    search_fields = ['title', 'description', 'category__name']
     ordering_fields = ['created_at', 'title', 'price']
     ordering = ['-created_at']
     permission_classes = [IsAuthenticated]

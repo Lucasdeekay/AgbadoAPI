@@ -6,31 +6,63 @@ bids, and bookings with comprehensive business logic and helper methods.
 """
 
 from datetime import datetime
+import math
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 
 from auth_app.models import User
-from provider_app.models import ServiceProvider
 
-CATEGORIES = [
-    ('Electrical', 'Electrical'),
-    ('Automobile', 'Automobile'),
-    ('Carpentry', 'Carpentry'),
-    ('Cleaning', 'Cleaning'),
-    ('Plumbing', 'Plumbing'),
-    ('Fumigation', 'Fumigation'),
-    ('Legal', 'Legal'),
-    ('Healthcare', 'Healthcare'),
-    ('Fashion', 'Fashion'),
-    ('Shopping', 'Shopping'),
-    ('Construction', 'Construction'),
-    ('Fitness', 'Fitness'),
-    ('Engineering', 'Engineering'),
-    ('Education', 'Education'),
-    ('Others', 'Others'),
-]
+class Category(models.Model):
+    """
+    Model representing service categories.
 
+    Prefilled with common categories such as Electrical, Automobile, Carpentry, etc.
+    Allows dynamic management instead of hardcoded choices.
+    """
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Name of the category (e.g., Electrical, Plumbing)"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this category is currently active"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When the category was created"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="When the category was last updated"
+    )
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Category"
+        verbose_name_plural = "Categories"
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["is_active"]),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def prefill_defaults(cls):
+        """
+        Prefill the database with default categories.
+        Call this in a migration, signal, or Django shell.
+        """
+        default_categories = [
+            "Electrical", "Automobile", "Carpentry", "Cleaning", "Plumbing",
+            "Fumigation", "Legal", "Healthcare", "Fashion", "Shopping",
+            "Construction", "Fitness", "Engineering", "Education", "Others",
+        ]
+        for cat in default_categories:
+            cls.objects.get_or_create(name=cat)
 
 class Service(models.Model):
     """
@@ -40,7 +72,7 @@ class Service(models.Model):
     availability status, and provider details.
     """
     provider = models.ForeignKey(
-        ServiceProvider, 
+        "provider_app.ServiceProvider", 
         on_delete=models.CASCADE, 
         related_name="services",
         help_text="Service provider offering this service"
@@ -57,10 +89,12 @@ class Service(models.Model):
         blank=True, 
         help_text="URL to an image representing the service"
     )
-    category = models.CharField(
-        max_length=100, 
-        choices=CATEGORIES, 
-        help_text="Service category/type"
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="services",
+        help_text="Category of the service"
     )
     min_price = models.DecimalField(
         max_digits=16, 
@@ -311,9 +345,11 @@ class ServiceRequest(models.Model):
         validators=[MinValueValidator(0.01)],
         help_text="Budget for the service request"
     )
-    category = models.CharField(
-        max_length=100, 
-        choices=CATEGORIES, 
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="service_requests",
         help_text="Category of the requested service"
     )
     status = models.CharField(
@@ -468,7 +504,7 @@ class ServiceRequestBid(models.Model):
         help_text="Service request being bid on"
     )
     provider = models.ForeignKey(
-        ServiceProvider, 
+        "provider_app.ServiceProvider", 
         on_delete=models.CASCADE, 
         related_name="bids",
         help_text="Provider making the bid"
@@ -647,7 +683,7 @@ class Booking(models.Model):
         help_text="The accepted bid for this booking"
     )
     provider = models.ForeignKey(
-        ServiceProvider,
+        "provider_app.ServiceProvider",
         on_delete=models.CASCADE,
         related_name="bookings",
         help_text="Service provider handling the booking"

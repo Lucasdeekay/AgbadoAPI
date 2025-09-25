@@ -11,24 +11,6 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 from auth_app.models import User
 
-CATEGORIES = [
-    ('Electrical', 'Electrical'),
-    ('Automobile', 'Automobile'),
-    ('Carpentry', 'Carpentry'),
-    ('Cleaning', 'Cleaning'),
-    ('Plumbing', 'Plumbing'),
-    ('Fumigation', 'Fumigation'),
-    ('Legal', 'Legal'),
-    ('Healthcare', 'Healthcare'),
-    ('Fashion', 'Fashion'),
-    ('Shopping', 'Shopping'),
-    ('Construction', 'Construction'),
-    ('Fitness', 'Fitness'),
-    ('Engineering', 'Engineering'),
-    ('Education', 'Education'),
-]
-
-
 class ServiceProvider(models.Model):
     """
     Model representing a service provider profile.
@@ -61,9 +43,11 @@ class ServiceProvider(models.Model):
     company_email = models.EmailField(
         help_text="Contact email address for the company"
     )
-    business_category = models.CharField(
-        max_length=100, 
-        choices=CATEGORIES, 
+    business_category = models.ForeignKey(
+        "service_app.Category",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="providers",
         help_text="Business category/type"
     )
     company_logo = models.URLField(

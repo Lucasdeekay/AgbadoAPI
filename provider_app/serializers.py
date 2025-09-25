@@ -8,6 +8,8 @@ for service provider-related models including company information and business d
 from rest_framework import serializers
 
 from auth_app.utils import upload_to_cloudinary
+from service_app.models import Category
+from service_app.serializers import CategorySerializer
 from .models import ServiceProvider
 
 import logging
@@ -23,6 +25,12 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
     company information, business details, and logo uploads.
     """
     company_logo = serializers.SerializerMethodField()
+    category = CategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.filter(is_active=True),
+        source="category",
+        write_only=True
+    )
 
     class Meta:
         model = ServiceProvider

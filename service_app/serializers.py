@@ -9,13 +9,42 @@ from rest_framework import serializers
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 from auth_app.utils import upload_to_cloudinary
-from .models import Service, SubService, ServiceRequest, ServiceRequestBid, Booking
+from .models import Category, Service, SubService, ServiceRequest, ServiceRequestBid, Booking
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
+
+class CategorySerializer(serializers.ModelSerializer):
+    """
+    Serializer for Category model.
+
+    Handles serialization and deserialization of service categories.
+    """
+    class Meta:
+        model = Category
+        fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'updated_at')
+        extra_kwargs = {
+            'name': {'required': True},
+            'is_active': {'required': False},
+        }
+
+    def validate_name(self, value):
+        """
+        Validate category name.
+        Ensures it's not empty and has reasonable length.
+        """
+        if not value or not value.strip():
+            raise serializers.ValidationError("Category name cannot be empty.")
+
+        if len(value) > 100:
+            raise serializers.ValidationError("Category name is too long. Maximum 100 characters.")
+
+        return value.strip()
+    
 class ServiceSerializer(serializers.ModelSerializer):
     """
     Serializer for Service model.
@@ -24,6 +53,12 @@ class ServiceSerializer(serializers.ModelSerializer):
     service information, pricing, and image uploads.
     """
     image = serializers.SerializerMethodField()
+    category = CategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.filter(is_active=True),
+        source="category",
+        write_only=True
+    )
 
     class Meta:
         model = Service
@@ -235,6 +270,12 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
     """
     image = serializers.SerializerMethodField()
     user = serializers.SerializerMethodField()
+    category = CategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.filter(is_active=True),
+        source="category",
+        write_only=True
+    )
 
     class Meta:
         model = ServiceRequest

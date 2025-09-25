@@ -41,8 +41,8 @@ class UserViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter)
     filterset_fields = ['email', 'phone_number', 'is_verified', 'is_active']
     search_fields = ['email', 'first_name', 'last_name', 'phone_number']
-    ordering_fields = ['created_at', 'last_login']
-    ordering = ['-created_at']
+    ordering_fields = ['first_name', 'last_name', 'email', 'date_joined', 'last_login']
+    ordering = ['-date_joined']
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
@@ -71,7 +71,7 @@ class KYCViewSet(viewsets.ModelViewSet):
     serializer_class = KYCSerializer
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend, OrderingFilter)
-    filterset_fields = ['status', 'is_verified']
+    filterset_fields = ['status',]
     ordering_fields = ['created_at', 'updated_at', 'verified_at']
     ordering = ['-updated_at']
     permission_classes = [IsAuthenticated]
@@ -100,7 +100,7 @@ class OTPViewSet(viewsets.ModelViewSet):
     serializer_class = OTPSerializer
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend, OrderingFilter)
-    filterset_fields = ['is_used', 'is_expired']
+    filterset_fields = ['is_used',]
     ordering_fields = ['created_at', 'expires_at']
     ordering = ['-created_at']
     permission_classes = [IsAuthenticated]
@@ -129,7 +129,6 @@ class ReferralViewSet(viewsets.ModelViewSet):
     serializer_class = ReferralSerializer
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend, OrderingFilter)
-    filterset_fields = ['is_rewarded']
     ordering_fields = ['created_at']
     ordering = ['-created_at']
     permission_classes = [IsAuthenticated]
