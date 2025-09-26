@@ -17,20 +17,14 @@ class Command(BaseCommand):
         )
 
         # --- 2. Create provider user ---
-        provider_user, _ = User.objects.get_or_create(
+        provider_user = User.objects.create(
             email="provider@example.com",
-            defaults={
-                "password": "strongpassword123",  # NOTE: won't hash unless using create_user
-                "phone_number": "08012345678",
-                "state": "Lagos",
-                "is_service_provider": True,
-                "is_verified": True,
-                "referral_code": "REF12345",
-            }
+            password="strongpassword123",  # NOTE: won't hash unless using create_user
+            phone_number="08012345678",
+            state="Lagos",
+            is_service_provider=True,
+            is_verified=True,
         )
-        if not provider_user.has_usable_password():
-            provider_user.set_password("strongpassword123")
-            provider_user.save()
 
         # --- 3. Create service provider profile ---
         provider, _ = ServiceProvider.objects.get_or_create(
@@ -77,19 +71,14 @@ class Command(BaseCommand):
         )
 
         # --- 5. Create a customer user ---
-        customer_user, _ = User.objects.get_or_create(
+        customer_user = User.objects.create(
             email="customer@example.com",
-            defaults={
-                "password": "customerpassword123",
-                "phone_number": "08123456789",
-                "state": "Lagos",
-                "is_service_provider": False,
-                "is_verified": True,
-            }
+            password="customerpassword123",
+            phone_number="08123456789",
+            state="Lagos",
+            is_service_provider=False,
+            is_verified=True,
         )
-        if not customer_user.has_usable_password():
-            customer_user.set_password("customerpassword123")
-            customer_user.save()
 
         # --- 6. Customer creates service requests ---
         req1, _ = ServiceRequest.objects.get_or_create(
