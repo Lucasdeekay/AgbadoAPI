@@ -13,8 +13,7 @@ class Command(BaseCommand):
 
         # --- 1. Create category ---
         plumbing_category, _ = Category.objects.get_or_create(
-            name="Plumbing",
-            defaults={"description": "All plumbing related services"}
+            name="Plumbing"
         )
 
         # --- 2. Create provider user ---
