@@ -5,153 +5,185 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         from auth_app.models import User
-        from provider_app.models import ServiceProvider, Service, SubService
-        from service_app.models import ServiceRequest, Booking, ServiceRequestBid
+        from provider_app.models import ServiceProvider
+        from service_app.models import (
+            ServiceRequest, Booking, ServiceRequestBid,
+            Service, SubService, Category
+        )
 
-        # --- 1. Create provider user ---
-        provider_user = User.objects.create_user(
+        # --- 1. Create category ---
+        plumbing_category, _ = Category.objects.get_or_create(
+            name="Plumbing",
+            defaults={"description": "All plumbing related services"}
+        )
+
+        # --- 2. Create provider user ---
+        provider_user, _ = User.objects.get_or_create(
             email="provider@example.com",
-            password="strongpassword123",
-            phone_number="08012345678",
-            state="Lagos",
-            is_service_provider=True,
-            is_verified=True
+            defaults={
+                "password": "strongpassword123",  # NOTE: won't hash unless using create_user
+                "phone_number": "08012345678",
+                "state": "Lagos",
+                "is_service_provider": True,
+                "is_verified": True,
+                "referral_code": "REF12345",
+            }
         )
-        provider_user.referral_code = "REF12345"
-        provider_user.save()
+        if not provider_user.has_usable_password():
+            provider_user.set_password("strongpassword123")
+            provider_user.save()
 
-        # --- 2. Create service provider profile ---
-        provider = ServiceProvider.objects.create(
+        # --- 3. Create service provider profile ---
+        provider, _ = ServiceProvider.objects.get_or_create(
             user=provider_user,
-            company_name="QuickFix Services Ltd",
-            company_address="123 Allen Avenue, Ikeja, Lagos",
-            company_description="We provide plumbing, electrical, and general home maintenance services.",
-            company_phone_no="08087654321",
-            company_email="contact@quickfix.com",
-            business_category="Plumbing",
-            is_approved=True
+            defaults={
+                "company_name": "QuickFix Services Ltd",
+                "company_address": "123 Allen Avenue, Ikeja, Lagos",
+                "company_description": "We provide plumbing, electrical, and general home maintenance services.",
+                "company_phone_no": "08087654321",
+                "company_email": "contact@quickfix.com",
+                "business_category": plumbing_category,
+                "is_approved": True,
+            }
         )
 
-        # --- 3. Create services & subservices ---
-        plumbing_service = Service.objects.create(
+        # --- 4. Create services & subservices ---
+        plumbing_service, _ = Service.objects.get_or_create(
             provider=provider,
             name="Plumbing",
-            description="All plumbing-related services",
-            price=5000.00,
-            category="Plumbing"
+            defaults={
+                "description": "All plumbing-related services",
+                "min_price": 5000.00,
+                "max_price": 8000.00,
+                "category": plumbing_category
+            }
         )
 
-        sub1 = SubService.objects.create(
+        sub1, _ = SubService.objects.get_or_create(
             service=plumbing_service,
             name="Pipe Installation",
-            description="Install new pipes and fittings",
-            price=7000.00
+            defaults={
+                "description": "Install new pipes and fittings",
+                "price": 7000.00
+            }
         )
-        sub2 = SubService.objects.create(
+
+        sub2, _ = SubService.objects.get_or_create(
             service=plumbing_service,
             name="Leak Repair",
-            description="Fix leaking pipes and taps",
-            price=3000.00
+            defaults={
+                "description": "Fix leaking pipes and taps",
+                "price": 3000.00
+            }
         )
 
-        # --- 4. Create a customer user ---
-        customer_user = User.objects.create_user(
+        # --- 5. Create a customer user ---
+        customer_user, _ = User.objects.get_or_create(
             email="customer@example.com",
-            password="customerpassword123",
-            phone_number="08123456789",
-            state="Lagos",
-            is_service_provider=False,
-            is_verified=True
+            defaults={
+                "password": "customerpassword123",
+                "phone_number": "08123456789",
+                "state": "Lagos",
+                "is_service_provider": False,
+                "is_verified": True,
+            }
         )
+        if not customer_user.has_usable_password():
+            customer_user.set_password("customerpassword123")
+            customer_user.save()
 
-        # --- 5. Customer creates service requests ---
-        req1 = ServiceRequest.objects.create(
+        # --- 6. Customer creates service requests ---
+        req1, _ = ServiceRequest.objects.get_or_create(
             user=customer_user,
             title="Need new pipe installation",
-            description="Require installation of water pipes in kitchen",
-            price=sub1.price,
-            category="Plumbing",
-            latitude=6.5244,
-            longitude=3.3792,
-            address="Customer House, Lagos"
+            defaults={
+                "description": "Require installation of water pipes in kitchen",
+                "price": sub1.price,
+                "category": plumbing_category,
+                "latitude": 6.5244,
+                "longitude": 3.3792,
+                "address": "Customer House, Lagos",
+            }
         )
 
-        req2 = ServiceRequest.objects.create(
+        req2, _ = ServiceRequest.objects.get_or_create(
             user=customer_user,
             title="Fix bathroom leak",
-            description="Bathroom tap leaking, needs repair",
-            price=sub2.price,
-            category="Plumbing",
-            latitude=6.5244,
-            longitude=3.3792,
-            address="Customer House, Lagos"
+            defaults={
+                "description": "Bathroom tap leaking, needs repair",
+                "price": sub2.price,
+                "category": plumbing_category,
+                "latitude": 6.5244,
+                "longitude": 3.3792,
+                "address": "Customer House, Lagos",
+            }
         )
 
-        # --- 6. Add bids for request 1 ---
-        bid1 = ServiceRequestBid.objects.create(
-            request=req1,
+        # --- 7. Add bids for request 1 ---
+        bid1, _ = ServiceRequestBid.objects.get_or_create(
+            service_request=req1,
             provider=provider,
-            proposed_amount=6800.00,
+            amount=6800.00,
             latitude=6.523,
             longitude=3.375
         )
+        bid1.is_accepted = True
+        bid1.save()
 
-        bid2 = ServiceRequestBid.objects.create(
-            request=req1,
+        bid2, _ = ServiceRequestBid.objects.get_or_create(
+            service_request=req1,
             provider=provider,
-            proposed_amount=7200.00,
+            amount=7200.00,
             latitude=6.526,
             longitude=3.380
         )
 
-        # Accept bid1 → create booking
-        accepted_bid = bid1
-        accepted_bid.is_accepted = True
-        accepted_bid.save()
-
-        booking1 = Booking.objects.create(
-            request=req1,
-            provider=accepted_bid.provider,
-            amount=accepted_bid.proposed_amount,
-            status="Confirmed"
+        booking1, _ = Booking.objects.get_or_create(
+            bid=bid1,  # ✅ Link booking to accepted bid
+            defaults={
+                "user": bid1.service_request.user,
+                "provider": bid1.provider,
+                "amount": bid1.amount,
+                "status": "Confirmed"
+            }
         )
 
-        # --- 7. Add bids for request 2 ---
-        bid3 = ServiceRequestBid.objects.create(
-            request=req2,
+        # --- 8. Add bids for request 2 ---
+        bid3, _ = ServiceRequestBid.objects.get_or_create(
+            service_request=req2,
             provider=provider,
-            proposed_amount=2800.00,
+            amount=2800.00,
             latitude=6.524,
             longitude=3.379
         )
 
-        bid4 = ServiceRequestBid.objects.create(
-            request=req2,
+        bid4, _ = ServiceRequestBid.objects.get_or_create(
+            service_request=req2,
             provider=provider,
-            proposed_amount=3100.00,
+            amount=3100.00,
             latitude=6.528,
             longitude=3.381
         )
+        bid4.is_accepted = True
+        bid4.save()
 
-        # Accept bid4 → create booking
-        accepted_bid2 = bid4
-        accepted_bid2.is_accepted = True
-        accepted_bid2.save()
-
-        booking2 = Booking.objects.create(
-            request=req2,
-            provider=accepted_bid2.provider,
-            amount=accepted_bid2.proposed_amount,
-            status="Pending"
+        booking2, _ = Booking.objects.get_or_create(
+            bid=bid4,  # ✅ Link booking to accepted bid
+            defaults={
+                "user": bid4.service_request.user,
+                "provider": bid4.provider,
+                "amount": bid4.amount,
+                "status": "Pending"
+            }
         )
 
+        # --- Final Output ---
         print("✅ Provider:", provider.company_name)
         print("✅ Customer:", customer_user.email)
         print("✅ Requests:", [req1.title, req2.title])
-        print("✅ Bids for req1:", [(b.id, b.proposed_amount, b.is_accepted) for b in [bid1, bid2]])
-        print("✅ Bids for req2:", [(b.id, b.proposed_amount, b.is_accepted) for b in [bid3, bid4]])
+        print("✅ Bids for req1:", [(b.id, b.amount, b.is_accepted) for b in [bid1, bid2]])
+        print("✅ Bids for req2:", [(b.id, b.amount, b.is_accepted) for b in [bid3, bid4]])
         print("✅ Bookings created:", [(booking1.id, booking1.amount, booking1.status),
-                                    (booking2.id, booking2.amount, booking2.status)])
+                                       (booking2.id, booking2.amount, booking2.status)])
 
-        
         self.stdout.write(self.style.SUCCESS("Demo data seeded successfully!"))
