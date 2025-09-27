@@ -17,7 +17,7 @@ class Command(BaseCommand):
         )
 
         # --- 2. Create provider user ---
-        provider_user = User.objects.create(
+        provider_user = User.objects.create_user(
             email="provider@example.com",
             password="strongpassword123",  # NOTE: won't hash unless using create_user
             phone_number="08012345678",
@@ -71,7 +71,7 @@ class Command(BaseCommand):
         )
 
         # --- 5. Create a customer user ---
-        customer_user = User.objects.create(
+        customer_user = User.objects.create_user(
             email="customer@example.com",
             password="customerpassword123",
             phone_number="08123456789",
