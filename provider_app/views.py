@@ -22,6 +22,8 @@ from provider_app.models import ServiceProvider
 
 import logging
 
+from service_app.models import Category
+
 logger = logging.getLogger(__name__)
 
 
@@ -69,6 +71,15 @@ class CreateServiceProviderView(APIView):
                 )
 
             try:
+                category, _ = Category.objects.get_or_create(name=business_category)
+            except Exception as e:
+                return Response(
+                    {"message": "Invalid Input."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+
+            try:
                 logo_url = None
                 if company_logo:
                     logo_url = upload_to_cloudinary(company_logo)
@@ -80,7 +91,7 @@ class CreateServiceProviderView(APIView):
                     company_description=company_description,
                     company_phone_no=company_phone_no,
                     company_email=company_email,
-                    business_category=business_category,
+                    business_category=category,
                     company_logo=logo_url,
                     opening_hour=opening_hour,
                     closing_hour=closing_hour,
@@ -162,6 +173,7 @@ class EditServiceProviderView(APIView):
                     {"message": "No data provided to update."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            
 
             try:
                 if company_name:
@@ -175,7 +187,14 @@ class EditServiceProviderView(APIView):
                 if company_email:
                     service_provider.company_email = company_email
                 if business_category:
-                    service_provider.business_category = business_category
+                    try:
+                        category, _ = Category.objects.get_or_create(name=business_category)
+                    except Exception as e:
+                        return Response(
+                            {"message": "Invalid Input."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    service_provider.business_category = category
                 if company_logo:
                     logo_url = upload_to_cloudinary(company_logo)
                     service_provider.company_logo = logo_url
@@ -250,7 +269,7 @@ class GetServiceProviderDetailsView(APIView):
                 "company_description": service_provider.company_description,
                 "company_phone_no": service_provider.company_phone_no,
                 "company_email": service_provider.company_email,
-                "business_category": service_provider.business_category,
+                "business_category": service_provider.business_category.name,
                 "company_logo": service_provider.company_logo,
                 "opening_hour": service_provider.opening_hour,
                 "closing_hour": service_provider.closing_hour,
