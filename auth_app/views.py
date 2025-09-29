@@ -808,7 +808,7 @@ class GoogleAppleAuthView(APIView):
         except CustomUser.DoesNotExist:
             # If user doesn't exist, register them
             logger.info(f"New user attempting social registration: {email}")
-            return redirect('register')
+            return redirect('register-user')
 
 
 # --- WebAuthn (FIDO2) Biometric Authentication Views ---
