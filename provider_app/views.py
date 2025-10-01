@@ -196,7 +196,7 @@ class EditServiceProviderView(APIView):
                         )
                     service_provider.business_category = category
                 if company_logo:
-                    logo_url = upload_to_cloudinary(company_logo)
+                    logo_url = upload_to_cloudinary(company_logo, old_image=service_provider.company_logo)
                     service_provider.company_logo = logo_url
                 if opening_hour:
                     service_provider.opening_hour = opening_hour

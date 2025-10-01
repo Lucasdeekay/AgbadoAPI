@@ -22,13 +22,12 @@ from auth_app.views import get_user_from_token
 from notification_app.models import Notification
 from provider_app.models import ServiceProvider
 from provider_app.serializers import ServiceProviderSerializer
-from service_app.models import ServiceRequest, ServiceRequestBid, SubService, Service, Booking
+from service_app.models import Category, ServiceRequest, ServiceRequestBid, SubService, Service, Booking
 from service_app.serializers import BookingSerializer, ServiceRequestBidSerializer, ServiceRequestSerializer, ServiceSerializer, SubServiceSerializer
 
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 
 class GetAllServicesDetailsView(APIView):
@@ -56,7 +55,7 @@ class GetAllServicesDetailsView(APIView):
                 "company_description": service_provider.company_description,
                 "company_phone_no": service_provider.company_phone_no,
                 "company_email": service_provider.company_email,
-                "business_category": service_provider.business_category,
+                "business_category": service_provider.business_category.name,
                 "company_logo": service_provider.company_logo,
                 "opening_hour": service_provider.opening_hour,
                 "closing_hour": service_provider.closing_hour,
@@ -73,14 +72,14 @@ class GetAllServicesDetailsView(APIView):
                 "name": service.name,
                 "description": service.description,
                 "image": service.image,
-                "category": service.category,
+                "category": service.category.name,
                 "min_price": service.min_price,
                 "max_price": service.max_price,
                 "is_active": service.is_active,
                 "created_at": service.created_at,
             } for service in services]
 
-            bookings = Booking.objects.filter(service_provider=service_provider.user).exclude(feedback=None)
+            bookings = Booking.objects.filter(provider=service_provider).exclude(feedback=None)
             reviews_data = [{
                 "user__email": booking.user.email,
                 "feedback": booking.feedback,
@@ -108,8 +107,6 @@ class GetAllServicesDetailsView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-
-
 class GetServiceDetailsView(APIView):
     """
     Get details of a specific service.
@@ -134,7 +131,7 @@ class GetServiceDetailsView(APIView):
                 "name": service.name,
                 "description": service.description,
                 "image": service.image,
-                "category": service.category,
+                "category": service.category.name,
                 "min_price": service.min_price,
                 "max_price": service.max_price,
                 "is_active": service.is_active,
@@ -165,8 +162,6 @@ class GetServiceDetailsView(APIView):
                 {"message": f"An error occurred: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-
 
 class GetSubServiceDetailsView(APIView):
     """
@@ -208,8 +203,6 @@ class GetSubServiceDetailsView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-
-
 class AddServiceView(APIView):
     """
     Add a new service.
@@ -243,6 +236,8 @@ class AddServiceView(APIView):
             else:
                 image_url = None
 
+            category, _ = Category.objects.get_or_create(name=category)
+
             service = Service.objects.create(
                 provider=service_provider,
                 name=name,
@@ -264,7 +259,7 @@ class AddServiceView(APIView):
                 'id': service.id,
                 'name': service.name,
                 'description': service.description,
-                'category': service.category,
+                'category': service.category.name,
                 'min_price': str(service.min_price),
                 'max_price': str(service.max_price),
                 'is_active': service.is_active,
@@ -289,8 +284,6 @@ class AddServiceView(APIView):
                 {"message": f"An error occurred: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-
 
 class AddSubServiceView(APIView):
     """
@@ -360,7 +353,6 @@ class AddSubServiceView(APIView):
             )
 
 
-
 class EditServiceView(APIView):
     """
     Edit an existing service.
@@ -382,7 +374,7 @@ class EditServiceView(APIView):
             service = get_object_or_404(Service, id=service_id)
 
             if 'image' in request.FILES:
-                service.image = upload_to_cloudinary(request.FILES['image'])
+                service.image = upload_to_cloudinary(request.FILES['image'], old_image=service.image)
 
             for field in ['name', 'description', 'category', 'min_price', 'max_price', 'is_active']:
                 if field in request.data:
@@ -412,7 +404,6 @@ class EditServiceView(APIView):
             )
 
 
-
 class EditSubServiceView(APIView):
     """
     Edit an existing subservice.
@@ -434,7 +425,7 @@ class EditSubServiceView(APIView):
             subservice = get_object_or_404(SubService, id=subservice_id)
 
             if 'image' in request.FILES:
-                subservice.image = upload_to_cloudinary(request.FILES['image'])
+                subservice.image = upload_to_cloudinary(request.FILES['image'], old_image=subservice.image)
 
             for field in ['name', 'description', 'price', 'is_active', 'service']:
                 if field in request.data:
@@ -464,7 +455,6 @@ class EditSubServiceView(APIView):
             )
 
 
-
 class ServiceProviderBookingsView(APIView):
     """
     Get all bookings for a service provider.
@@ -474,11 +464,12 @@ class ServiceProviderBookingsView(APIView):
 
     def get(self, request, *args, **kwargs):
         try:
-            provider = get_user_from_token(request)
+            user = get_user_from_token(request)
+            provider = ServiceProvider.objects.get(user=user)
             bookings = Booking.objects.filter(provider=provider)
             serializer = BookingSerializer(bookings, many=True)
 
-            logger.info(f"Retrieved {len(bookings)} bookings for provider: {provider.email}")
+            logger.info(f"Retrieved {len(bookings)} bookings for provider: {provider}")
             return Response({'bookings': serializer.data})
 
         except Exception as e:
@@ -487,7 +478,6 @@ class ServiceProviderBookingsView(APIView):
                 {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ServiceProviderBidsView(APIView):
@@ -517,15 +507,24 @@ class ServiceProviderBidsView(APIView):
                 service_requests, many=True, context={'request': request}
             )
 
-            bids = ServiceRequestBid.objects.filter(provider=user)
-            bid_serializer = ServiceRequestBidSerializer(
-                bids, many=True, context={'request': request}
-            )
+            bids = ServiceRequestBid.objects.filter(provider=provider)
+            bid_data = [{
+                'id': bid.id,
+                'service_request': ServiceRequestSerializer(bid.service_request).data,
+                'amount': str(bid.amount),
+                'proposal': bid.proposal,
+                'status': bid.status,
+                'latitude': bid.latitude,
+                'longitude': bid.longitude,
+                'address': bid.address,
+                'distance': bid.calculate_distance_km(),
+                'created_at': bid.created_at.isoformat(),
+            } for bid in bids]
 
             logger.info(f"Retrieved {len(service_requests)} requests & {len(bids)} bids for provider: {provider.company_name}")
             return Response({
                 'requests': request_serializer.data,
-                'bids': bid_serializer.data,
+                'bids': bid_data,
             })
 
         except Exception as e:
@@ -534,7 +533,6 @@ class ServiceProviderBidsView(APIView):
                 {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 class SubmitBidView(APIView):
     """
@@ -545,7 +543,8 @@ class SubmitBidView(APIView):
 
     def post(self, request, service_request_id, *args, **kwargs):
         try:
-            provider = get_user_from_token(request)
+            user = get_user_from_token(request)
+            provider = ServiceProvider.objects.get(user=user)
 
             try:
                 service_request = ServiceRequest.objects.get(id=int(service_request_id))
@@ -554,6 +553,9 @@ class SubmitBidView(APIView):
 
             amount = request.data.get('amount')
             proposal = request.data.get('proposal')
+            laitude = request.data.get('laitude')
+            longitude = request.data.get('longitude')
+            address = request.data.get('address')
 
             if not amount:
                 return Response({"message": "Amount is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -571,12 +573,15 @@ class SubmitBidView(APIView):
             if existing_bid:
                 existing_bid.amount = amount
                 existing_bid.proposal = proposal or existing_bid.proposal
+                existing_bid.latitude = laitude or existing_bid.latitude
+                existing_bid.longitude = longitude or existing_bid.longitude
+                existing_bid.address = address or existing_bid.address
                 existing_bid.save()
 
                 Notification.objects.create(
                     user=service_request.user,
                     title="Bid Updated",
-                    message=f"{provider.email} updated their bid on your request: {service_request.title}"
+                    message=f"{provider.user.email} updated their bid on your request: {service_request.title}"
                 )
 
                 logger.info(f"Bid updated for request {service_request.title}")
@@ -593,7 +598,7 @@ class SubmitBidView(APIView):
                 Notification.objects.create(
                     user=service_request.user,
                     title="New Bid Submitted",
-                    message=f"{provider.email} submitted a bid on your request: {service_request.title}"
+                    message=f"{provider.user.email} submitted a bid on your request: {service_request.title}"
                 )
 
                 logger.info(f"Bid submitted for request {service_request.title}")
@@ -601,6 +606,80 @@ class SubmitBidView(APIView):
 
         except Exception as e:
             logger.error(f"Error submitting bid: {str(e)}")
+            return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class WithdrawBidView(APIView):
+    """
+    Withdraw a bid -> Withdraw a bid made for a request.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, bid_id, *args, **kwargs):
+        try:
+            user = get_user_from_token(request)
+            provider = ServiceProvider.objects.get(user=user)
+
+            try:
+                bid = ServiceRequestBid.objects.get(id=bid_id, provider=provider)
+            except ServiceRequestBid.DoesNotExist:
+                raise NotFound("Bid not found or not yours to accept")
+
+
+            # Accept the chosen bid
+            bid.status = "Withdrawn"
+            bid.save()
+
+            Notification.objects.create(
+                user=bid.provider.user,
+                title="Bid Withdrawn",
+                message=f"Your bid for {bid.service_request.title} was withdrawn!"
+            )
+
+            logger.info(f"Bid {bid.id} for Service Request has {bid.service_request.id} has been withdrawn")
+            return Response(
+                {"message": "Bid withdrawn successfully"},
+                status=status.HTTP_201_CREATED
+            )
+
+        except Exception as e:
+            logger.error(f"Error withdrawing bid: {str(e)}")
+            return Response(
+                {"message": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+class InProgressBookingView(APIView):
+    """
+    Set a booking in progress by the provider.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, booking_id, *args, **kwargs):
+        try:
+            user = get_user_from_token(request)
+            provider = ServiceProvider.objects.get(user=user)
+
+            try:
+                booking = Booking.objects.get(id=int(booking_id), provider=provider)
+            except Booking.DoesNotExist:
+                raise NotFound("Booking not found")
+
+            booking.status = 'In Progress'
+            booking.save()
+
+            Notification.objects.create(
+                user=booking.user,
+                title="Booking In Progress",
+                message=f"Your booking for {booking.bid.service_request.title} was set in progress."
+            )
+
+            logger.info(f"Booking {booking.id} in progress by provider {provider}")
+            return Response({"message": "Booking in progress successfully"}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error setting booking in progress: {str(e)}")
             return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -613,10 +692,11 @@ class CancelBookingView(APIView):
 
     def post(self, request, booking_id, *args, **kwargs):
         try:
-            provider = get_user_from_token(request)
+            user = get_user_from_token(request)
+            provider = ServiceProvider.objects.get(user=user)
 
             try:
-                booking = Booking.objects.get(id=int(booking_id), provider=provider)
+                booking = Booking.objects.get(id=int(booking_id))
             except Booking.DoesNotExist:
                 raise NotFound("Booking not found")
 
@@ -629,7 +709,7 @@ class CancelBookingView(APIView):
                 message=f"Your booking for {booking.bid.service_request.title} was cancelled."
             )
 
-            logger.info(f"Booking {booking.id} cancelled by provider {provider.email}")
+            logger.info(f"Booking {booking.id} cancelled by provider {provider}")
             return Response({"message": "Booking cancelled successfully"}, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -646,7 +726,8 @@ class CompleteBookingView(APIView):
 
     def post(self, request, booking_id, *args, **kwargs):
         try:
-            provider = get_user_from_token(request)
+            user = get_user_from_token(request)
+            provider = ServiceProvider.objects.get(user=user)
 
             try:
                 booking = Booking.objects.get(id=int(booking_id), provider=provider)
@@ -662,11 +743,45 @@ class CompleteBookingView(APIView):
                 message=f"Your booking for {booking.bid.service_request.title} has been marked as completed."
             )
 
-            logger.info(f"Booking {booking.id} marked completed by provider {provider.email}")
+            logger.info(f"Booking {booking.id} marked completed by provider {provider}")
             return Response({"message": "Booking marked as completed"}, status=status.HTTP_200_OK)
 
         except Exception as e:
             logger.error(f"Error completing booking: {str(e)}")
+            return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+class ConfirmBookingView(APIView):
+    """
+    Mark a booking as confirmed by the user.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, booking_id, *args, **kwargs):
+        try:
+            user = get_user_from_token(request)
+
+            try:
+                booking = Booking.objects.get(id=int(booking_id), user=user)
+            except Booking.DoesNotExist:
+                raise NotFound("Booking not found")
+
+            booking.status = 'Confirmed'
+            booking.save()
+
+            Notification.objects.create(
+                user=booking.provider.user,
+                title="Booking Confirmed",
+                message=f"Your booking for {booking.bid.service_request.title} has been marked as confirmed."
+            )
+            print("Saved")
+
+            logger.info(f"Booking {booking.id} marked confirmed by provider {user.email}")
+            return Response({"message": "Booking marked as confirmed"}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error confirming booking: {str(e)}")
             return Response({"message": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class UserBookingsView(APIView):
@@ -708,6 +823,11 @@ class AcceptBidView(APIView):
                 bid = ServiceRequestBid.objects.get(id=bid_id, service_request__user=user)
             except ServiceRequestBid.DoesNotExist:
                 raise NotFound("Bid not found or not yours to accept")
+            
+            # Update service request status
+            request = bid.service_request
+            request.status = "Awarded"
+            request.save()
 
             # Reject all other bids for this service request
             other_bids = ServiceRequestBid.objects.filter(
@@ -738,7 +858,7 @@ class AcceptBidView(APIView):
             )
 
             Notification.objects.create(
-                user=bid.provider,
+                user=ServiceProvider.objects.get(id=bid.provider.id).user,
                 title="Bid Accepted",
                 message=f"Your bid for {bid.service_request.title} was accepted!"
             )
@@ -777,7 +897,7 @@ class DeclineBidView(APIView):
             bid.save()
 
             Notification.objects.create(
-                user=bid.provider,
+                user=ServiceProvider.objects.get(id=bid.provider.id).user,
                 title="Bid Rejected",
                 message=f"Your bid for {bid.service_request.title} was declined."
             )
@@ -792,5 +912,260 @@ class DeclineBidView(APIView):
             logger.error(f"Error declining bid: {str(e)}")
             return Response(
                 {"message": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class CreateServiceRequestView(APIView):
+    """
+    Create a service request.
+    
+    Allows user to create new service request.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """
+        Create a service request.
+        
+        Required fields: title, description, category, price
+        Optional fields: longitude, latitude, address
+        """
+        try:
+            user = get_user_from_token(request)
+
+            title = request.data.get('title')
+            description = request.data.get('description')
+            category = request.data.get('category')
+            price = request.data.get('price')
+            latitude = request.data.get('latitude')
+            longitude = request.data.get('longitude')
+            address = request.data.get('address')
+            image = request.FILES.get('image')
+
+            if image:
+                image_url = upload_to_cloudinary(image)
+            else:
+                image_url = None
+
+            category, _ = Category.objects.get_or_create(name=category)
+
+            service_request = ServiceRequest.objects.create(
+                user=user,
+                title=title,
+                description=description,
+                category=category,
+                price=price,
+                latitude=latitude,
+                longitude=longitude,
+                address=address,
+                image=image_url,
+            )
+
+            Notification.objects.create(
+                user=user,
+                title="New Service Request Added",
+                message=f"You have added a new service request: {service_request.title}"
+            )
+
+            service_request_data = {
+                'id': service_request.id,
+                'title': service_request.title,
+                'description': service_request.description,
+                'category': service_request.category.name,
+                'price': str(service_request.price),
+                'status': service_request.status,
+                'latitude': service_request.latitude,
+                'longitude': service_request.longitude,
+                'address': service_request.address,
+                'image': service_request.image,
+                'created_at': service_request.created_at.isoformat(),
+            }
+            
+            logger.info(f"Service Request added successfully: {service_request.title}")
+            return Response(
+                {"message": "Service Request added successfully.", "service":service_request_data}, 
+                status=status.HTTP_201_CREATED
+            )
+
+        except Exception as e:
+            logger.error(f"Error adding service request: {str(e)}")
+            return Response(
+                {"message": f"An error occurred: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+
+class EditServiceRequestView(APIView):
+    """
+    Create a service request.
+    
+    Allows user to create new service request.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, service_request_id, *args, **kwargs):
+        """
+        Create a service request.
+        
+        Required fields: title, description, category, price
+        Optional fields: longitude, latitude, address
+        """
+        try:
+            user = get_user_from_token(request)
+
+            title = request.data.get('title')
+            description = request.data.get('description')
+            category = request.data.get('category')
+            price = request.data.get('price')
+            latitude = request.data.get('latitude')
+            longitude = request.data.get('longitude')
+            address = request.data.get('address')
+            image = request.FILES.get('image', None)
+
+            service_request = ServiceRequest.objects.get(id=service_request_id)
+            
+            if title:
+                service_request.title = title
+            if description:
+                service_request.description = description
+            if category:
+                category, _ = Category.objects.get_or_create(name=category)
+                service_request.category = category
+            if price:
+                service_request.price = price
+            if latitude:
+                service_request.latitude = latitude
+            if longitude:
+                service_request.longitude = longitude
+            if address:
+                service_request.address = address
+            if image_url:
+                image_url = upload_to_cloudinary(image, old_image=service_request.image)
+                service_request.image = image_url
+            else:
+                image_url = None
+
+            Notification.objects.create(
+                user=user,
+                title="Service Request Updated",
+                message=f"You have update a service request: {service_request.title}"
+            )
+
+            service_request_data = {
+                'id': service_request.id,
+                'title': service_request.title,
+                'description': service_request.description,
+                'category': service_request.category.name,
+                'price': str(service_request.price),
+                'status': service_request.status,
+                'latitude': service_request.latitude,
+                'longitude': service_request.longitude,
+                'address': service_request.address,
+                'image': service_request.image,
+                'created_at': service_request.created_at.isoformat(),
+            }
+            
+            logger.info(f"Service Request updated successfully: {service_request.title}")
+            return Response(
+                {"message": "Service Request updated successfully.", "service":service_request_data}, 
+                status=status.HTTP_201_CREATED
+            )
+
+        except Exception as e:
+            logger.error(f"Error updating service request: {str(e)}")
+            return Response(
+                {"message": f"An error occurred: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+
+class GetUserServiceRequestsView(APIView):
+    """
+    Get all service requests made by a user.
+    
+    Retrieves comprehensive information about the user's service requests.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Get all service requests made by a user.
+        """
+        try:
+            user = get_user_from_token(request)
+
+            service_requests = ServiceRequest.objects.filter(user=user)
+            service_request_data = [{
+                'id': request.id,
+                'title': request.title,
+                'description': request.description,
+                'category': request.category.name,
+                'price': str(request.price),
+                'status': request.status,
+                'latitude': request.latitude,
+                'longitude': request.longitude,
+                'address': request.address,
+                'image': request.image,
+                'created_at': request.created_at.isoformat(),
+            } for request in service_requests]
+
+            
+            logger.info(f"Retrieved service requests for user: {user}")
+            return Response({
+                "service_requests": service_request_data,
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error retrieving services requests: {str(e)}")
+            return Response(
+                {"message": f"An error occurred: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class GetServiceRequestBidsView(APIView):
+    """
+    Get all bids for a service request.
+    
+    Retrieves comprehensive information about the service request's bids.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, service_request_id, *args, **kwargs):
+        """
+        Get all bids for a service request.
+        """
+        try:
+            user = get_user_from_token(request)
+
+            service_request = ServiceRequest.objects.get(id=service_request_id)
+            bids = ServiceRequestBid.objects.filter(service_request=service_request)
+            bid_data = [{
+                'id': bid.id,
+                'service_request': ServiceRequestSerializer(bid.service_request).data,
+                'amount': str(bid.amount),
+                'proposal': bid.proposal,
+                'status': bid.status,
+                'latitude': bid.latitude,
+                'longitude': bid.longitude,
+                'address': bid.address,
+                'distance': bid.calculate_distance_km(),
+                'created_at': bid.created_at.isoformat(),
+            } for bid in bids]
+
+            
+            logger.info(f"Retrieved service request bids for user: {user}")
+            return Response({
+                "bids": bid_data,
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error retrieving services request bids: {str(e)}")
+            return Response(
+                {"message": f"An error occurred: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

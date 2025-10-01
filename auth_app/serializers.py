@@ -276,6 +276,7 @@ class KYCSerializer(serializers.ModelSerializer):
                 except ValueError as e:
                     raise serializers.ValidationError({"bvn": str(e)})
             logger.info(f"KYC updated successfully for user: {kyc.user.email}")
+            return kyc
             
         except Exception as e:
             logger.error(f"Error updating KYC: {str(e)}")

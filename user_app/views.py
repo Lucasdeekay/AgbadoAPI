@@ -182,9 +182,7 @@ class UpdateUserProfileView(APIView):
             if state:
                 user.state = state
             if profile_picture:
-                cloud_url = upload_to_cloudinary(profile_picture)
-                print(f"Uploaded image URL: {cloud_url}")
-
+                cloud_url = upload_to_cloudinary(profile_picture, old_image=user.profile_picture)
                 user.profile_picture = cloud_url
 
             user.save()

@@ -2,6 +2,7 @@ from datetime import datetime
 import os
 import random
 import re
+import cloudinary
 from django.core.mail import send_mail
 import requests
 import hashlib
@@ -14,6 +15,9 @@ import string
 from agbado import settings
 from .models import OTP, User
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 def generate_unique_referral_code():
     """
@@ -161,18 +165,56 @@ def log_to_server(message, error=None, log_file_path="agbado.log"):
         print(f"Failed to write to log file: {e}")
 
 
-def upload_to_cloudinary(image_file):
+def upload_to_cloudinary(image_file, old_image=None):
+    """
+    Uploads an image file to Cloudinary and optionally deletes a previous image.
+
+    Args:
+        image_file: The Django InMemoryUploadedFile object.
+        old_image (str, optional): The URL of the image to be deleted.
+                                   If passed, the public ID is extracted and deleted.
+                                   Defaults to None.
+
+    Returns:
+        str: The URL of the newly uploaded image, or None on failure.
+    """
     cloud_name = config("CLOUDINARY_CLOUD_NAME")
     api_key = config("CLOUDINARY_API_KEY")
+    api_secret = config("CLOUDINARY_API_SECRET") # New: Required for signed deletes
     upload_preset = config("CLOUDINARY_UPLOAD_PRESET")
 
+    # --- 1. Delete Old Image (If provided) ---
+    if old_image:
+        try:
+            # Extract public ID from the Cloudinary URL
+            # The URL structure is typically: .../v<version>/<public_id>.<extension>
+            parts = old_image.split('/')
+            # public_id is usually the last part without the extension
+            public_id_with_ext = parts[-1]
+            public_id = public_id_with_ext.split('.')[0]
+            
+            logger.info(f"Attempting to delete old image with public ID: {public_id}")
+
+            # Use Cloudinary's built-in SDK for a signed delete operation
+            delete_response = cloudinary.uploader.destroy(public_id)
+
+            if delete_response.get('result') == 'ok':
+                logger.info(f"Successfully deleted old image: {old_image}")
+            else:
+                logger.warning(f"Failed to delete old image {old_image}. Cloudinary response: {delete_response}")
+
+        except Exception as e:
+            logger.error(f"Error during Cloudinary deletion for {old_image}: {e}")
+            # Continue with upload even if deletion fails
+
+    # --- 2. Upload New Image ---
     upload_url = f"https://api.cloudinary.com/v1_1/{cloud_name}/image/upload"
 
-    # Rewind in case it’s already been read
+    # Rewind in case it’s already been read (Django's file handling often reads it)
     image_file.seek(0)
 
     files = {
-        "file": image_file,  # Don't use .read() — just pass the file object directly
+        "file": image_file,
     }
 
     data = {
@@ -180,10 +222,23 @@ def upload_to_cloudinary(image_file):
         "upload_preset": upload_preset,
     }
 
-    response = requests.post(upload_url, files=files, data=data)
-    print(f'{response.json()}')
+    try:
+        response = requests.post(upload_url, files=files, data=data)
+        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+        
+        upload_result = response.json()
+        
+        if upload_result.get('secure_url'):
+            new_image_url = upload_result['secure_url']
+            logger.info(f"New image uploaded successfully. URL: {new_image_url}")
+            return new_image_url
+        else:
+            logger.error(f"Cloudinary upload failed. Response: {upload_result}")
+            return None
 
-    if response.status_code == 200:
-        return response.json()["secure_url"]
-    else:
-        raise Exception(f"Cloudinary upload failed: {response.text}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"HTTP Request error during Cloudinary upload: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error during Cloudinary upload: {e}")
+        return None

@@ -432,23 +432,15 @@ class ServiceRequestBidSerializer(serializers.ModelSerializer):
         
         Returns service provider data including ID, email, name, and profile picture.
         """
-        request = self.context.get('request')
-        profile_pic_url = None
-        
-        if obj.service_provider.profile_picture and hasattr(obj.service_provider.profile_picture, 'url'):
-            if request:
-                profile_pic_url = request.build_absolute_uri(obj.service_provider.profile_picture.url)
-            else:
-                profile_pic_url = obj.service_provider.profile_picture.url
-        elif isinstance(obj.service_provider.profile_picture, str):
-            profile_pic_url = obj.service_provider.profile_picture
+        if not obj.service_provider:
+            return None
 
         return {
             "id": obj.service_provider.id,
-            "email": obj.service_provider.email,
-            "first_name": obj.service_provider.first_name,
-            "last_name": obj.service_provider.last_name,
-            "profile_picture": profile_pic_url,
+            "email": obj.service_provider.user.email,
+            "first_name": obj.service_provider.user.first_name,
+            "last_name": obj.service_provider.user.last_name,
+            "company_logo": getattr(obj.service_provider, "company_logo", None),
         }
 
     def get_service_request(self, obj):
@@ -464,7 +456,7 @@ class ServiceRequestBidSerializer(serializers.ModelSerializer):
             "description": obj.service_request.description,
             "image": obj.service_request.image,
             "price": str(obj.service_request.price),
-            "category": obj.service_request.category,
+            "category": obj.service_request.category.name,
             "status": obj.service_request.status,
             "created_at": obj.service_request.created_at,
             "updated_at": obj.service_request.updated_at,
@@ -535,10 +527,10 @@ class BookingSerializer(serializers.ModelSerializer):
             return None
         return {
             "id": obj.provider.id,
-            "email": obj.provider.email,
-            "first_name": obj.provider.first_name,
-            "last_name": obj.provider.last_name,
-            "profile_picture": getattr(obj.provider, "profile_picture", None),
+            "email": obj.provider.user.email,
+            "first_name": obj.provider.user.first_name,
+            "last_name": obj.provider.user.last_name,
+            "company_logo": getattr(obj.provider, "company_logo", None),
             "company_name": getattr(obj.provider, "company_name", None),
         }
 
@@ -557,7 +549,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 "id": bid.service_request.id,
                 "title": bid.service_request.title,
                 "description": bid.service_request.description,
-                "category": bid.service_request.category,
+                "category": bid.service_request.category.name,
                 "price": bid.service_request.price,
                 "status": bid.service_request.status,
             } if bid.service_request else None
