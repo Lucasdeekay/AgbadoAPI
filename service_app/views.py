@@ -1169,3 +1169,43 @@ class GetServiceRequestBidsView(APIView):
                 {"message": f"An error occurred: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class GetServiceRequestDetailsView(APIView):
+    """
+    Get details of a specific service request.
+    
+    Retrieves service request information.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, service_request_id):
+        """
+        Get details of a specific service request.
+        
+        URL parameter: service_request_id
+        """
+        try:
+            service_request = get_object_or_404(SubService, id=service_request_id)
+            service_request_data = {
+                "id": service_request.id,
+                "title": service_request.title,
+                "description": service_request.description,
+                "price": service_request.price,
+                "category": service_request.category.name,
+                "status": service_request.status,
+                "image": service_request.image,
+                "created_at": service_request.created_at,
+            }
+
+            logger.info(f"Retrieved service request details for service request ID: {service_request_id}")
+            return Response({
+                "service_request": service_request_data
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error retrieving service request details for service request ID {service_request_id}: {str(e)}")
+            return Response(
+                {"message": f"An error occurred: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

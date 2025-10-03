@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from .views import (
-    CancelBookingView, CompleteBookingView, ConfirmBookingView, CreateServiceRequestView, EditServiceRequestView, GetServiceRequestBidsView, GetSubServiceDetailsView, GetUserServiceRequestsView, InProgressBookingView, 
+    CancelBookingView, CompleteBookingView, ConfirmBookingView, CreateServiceRequestView, EditServiceRequestView, GetServiceRequestBidsView, GetServiceRequestDetailsView, GetSubServiceDetailsView, GetUserServiceRequestsView, InProgressBookingView, 
     ServiceProviderBidsView, ServiceProviderBookingsView, GetAllServicesDetailsView, 
     GetServiceDetailsView, AddServiceView, AddSubServiceView, EditServiceView, 
     EditSubServiceView, SubmitBidView, UserBookingsView, AcceptBidView, DeclineBidView, WithdrawBidView
@@ -50,6 +50,7 @@ urlpatterns = [
     path('request/create/', CreateServiceRequestView.as_view(), name='create-service-request'),
     path('request/edit/<int:service_request_id>/', EditServiceRequestView.as_view(), name='edit-service-request'),
     path('requests/', GetUserServiceRequestsView.as_view(), name='get-user-service-requests'),
+    path('request/<int:service_request_id>/', GetServiceRequestDetailsView.as_view(), name='get-service-request-details'),
 
     # 🔹 DRF Router
     path('api/', include(router.urls)),
