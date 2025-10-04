@@ -1195,6 +1195,8 @@ class GetServiceRequestDetailsView(APIView):
                 "category": service_request.category.name,
                 "status": service_request.status,
                 "image": service_request.image,
+                "address": service_request.image,
+                "bid_count": service_request.get_bids_count(),
                 "created_at": service_request.created_at,
             }
 
