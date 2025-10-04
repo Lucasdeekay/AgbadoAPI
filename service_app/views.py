@@ -1147,6 +1147,7 @@ class GetServiceRequestBidsView(APIView):
             bid_data = [{
                 'id': bid.id,
                 'service_request': ServiceRequestSerializer(bid.service_request).data,
+                'provider': ServiceProviderSerializer(bid.provider).data,
                 'amount': str(bid.amount),
                 'proposal': bid.proposal,
                 'status': bid.status,
